@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amimi Milano — Strumenti</title>
   <meta name="description" content="Hub centralizzato delle dashboard e degli strumenti operativi di Amimi Milano.">
+  <meta name="theme-color" content="#5B3A29">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Amimi Milano — Strumenti &amp; dashboard">
+  <meta property="og:description" content="Hub centralizzato di tutte le dashboard e le app operative di Amimi Milano.">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👜</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -208,6 +214,7 @@
     }
     .card .tag.primary { background: #e3efde; color: var(--green); }
     .card .tag.backup  { background: var(--cream); color: var(--brown-soft); }
+    .card .tag.readonly { background: #f6e3d6; color: var(--brown-mid); }
 
     /* ===== BACKUP SECTION ===== */
     .backup-section {
@@ -269,21 +276,21 @@
 
       <a class="card" href="https://script.google.com/macros/s/AKfycbz191UCEsQjkoRtIVSA__LC6q2S89utKr4KGc3vws-EGn6sTisMaRdOujfAgTloyGYB/exec" target="_blank" rel="noopener">
         <span class="tag primary">Primary</span>
-        <span class="icon">📊</span>
+        <span class="icon" aria-hidden="true">📊</span>
         <h2>Master Dashboard</h2>
         <p>Operations a 360°: Shopify, Inventario, Finanza, Marketing, Google Ads, Meta Ads, Margini, Fornitori. La dashboard più completa, refresh giornaliero.</p>
         <span class="open">Apri →</span>
       </a>
 
       <a class="card" href="https://script.google.com/macros/s/AKfycbxLPMvI1ESnbhKETqF7uAeb28Z5IUHNj-aShULiSliIE5BfgL7DstpEtcY3KVfR9pucfw/exec" target="_blank" rel="noopener">
-        <span class="icon">💰</span>
+        <span class="icon" aria-hidden="true">💰</span>
         <h2>Finance Dashboard</h2>
         <p>Conto Economico mensile, MC1 / MC2, margini, breakdown costi. Vista finanziaria approfondita per controllo di gestione.</p>
         <span class="open">Apri →</span>
       </a>
 
       <a class="card" href="https://script.google.com/macros/s/AKfycbxiPklYkEVRjwY-Irbw2CE7bKo_jv79V-Pk5ss0DAyfu84lIhHcuqsxAqTNah0iBPoKVA/exec" target="_blank" rel="noopener">
-        <span class="icon">🎯</span>
+        <span class="icon" aria-hidden="true">🎯</span>
         <h2>Obiettivi Tracker</h2>
         <p>Roadmap dei progetti e degli obiettivi Amimi. Vertical card timeline per pianificazione strategica.</p>
         <span class="open">Apri →</span>
@@ -297,16 +304,24 @@
     <div class="grid">
 
       <a class="card" href="https://script.google.com/macros/s/AKfycbyLC5GsJIDZn0OMR0xPM87Cz6jL4cVVUiU4KJ8kmb8TBHd76EXMQVlNlYGWAl3PPKAY/exec" target="_blank" rel="noopener">
-        <span class="icon">📦</span>
+        <span class="icon" aria-hidden="true">📦</span>
         <h2>Spedizioni UI</h2>
         <p>Approvazione e gestione spedizioni MyTWS. Revisione candidati, creazione etichette, sincronizzazione Shopify fulfillment.</p>
         <span class="open">Apri →</span>
       </a>
 
       <a class="card" href="https://www.appsheet.com/start/5bf4b820-7a89-45d0-a2ca-ad10a07d9df4" target="_blank" rel="noopener">
-        <span class="icon">🛒</span>
+        <span class="icon" aria-hidden="true">🛒</span>
         <h2>Inserisci Acquisto</h2>
         <p>Form mobile AppSheet per registrare gli acquisti dai fornitori. Auto-popola ACQUISTI, Product_Map e Product_COGS&amp;Price.</p>
+        <span class="open">Apri →</span>
+      </a>
+
+      <a class="card" href="https://script.google.com/macros/s/AKfycbysjtl3xjTZBr3OEa0plHiHPmMqtYtfwD_TdRTEc97-Zqd0U3EyngsR2YR1uUlHi0Zspg/exec" target="_blank" rel="noopener">
+        <span class="tag readonly">Sola lettura</span>
+        <span class="icon" aria-hidden="true">📋</span>
+        <h2>Inventario &amp; Disponibilità</h2>
+        <p>Inventario gestionale a confronto con Shopify e storico delle SKU disponibili online. Link pubblico (no login), aggiornato da Master e Shopify.</p>
         <span class="open">Apri →</span>
       </a>
 
@@ -319,7 +334,7 @@
 
       <a class="card muted" href="https://script.google.com/macros/s/AKfycbxapoqHx-KmjY8_EZeuYpfsACfp33Oz_muHgtxr3MlmDYZ9OfFYEHLl7W1DcxktUlLi4A/exec" target="_blank" rel="noopener">
         <span class="tag backup">Fallback</span>
-        <span class="icon">✨</span>
+        <span class="icon" aria-hidden="true">✨</span>
         <h2>Amimi Ads — standalone</h2>
         <p>Dashboard Meta Ads dedicata (precede l'integrazione nel Master Dashboard tab "Meta Ads"). Mantenuta come fallback operativo se la Master ha problemi.</p>
         <span class="open">Apri →</span>
@@ -330,7 +345,7 @@
 
   <footer>
     <p>Sviluppato per <strong>Amimi Milano</strong> · stack Google Apps Script + AppSheet · costo €0/mese</p>
-    <p class="meta">Repository: <a href="https://github.com/NoobHandbag/amimi-finance-system" target="_blank" rel="noopener">github.com/NoobHandbag/amimi-finance-system</a></p>
+    <p class="meta">Repository: <a href="https://github.com/NoobHandbag/amimi-finance-system" target="_blank" rel="noopener">github.com/NoobHandbag/amimi-finance-system</a> · ultimo aggiornamento 14 giugno 2026</p>
   </footer>
 
 </div>
