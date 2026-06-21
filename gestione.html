@@ -75,6 +75,27 @@
   .modal h3{margin:0 0 4px;font-size:17px} .modal p{margin:0 0 14px;font-size:13px;color:var(--muted)}
   .lab{font-size:12px;color:var(--faint);margin-bottom:5px}
   .res{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line);cursor:pointer}
+  /* --- Inventario / dashboard integration --- */
+  .subtab{display:flex;gap:3px;background:var(--bg);border:1px solid var(--line);border-radius:var(--rmd);padding:3px}
+  .subtab .t{flex:1;text-align:center;font-size:12.5px;padding:8px 4px;color:var(--muted);cursor:pointer;border-radius:8px;font-weight:500}
+  .subtab .t.on{background:var(--card);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(45,34,38,.12)}
+  .ikpis{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 2px}
+  .ikpi{flex:1 1 28%;min-width:88px;background:var(--card);border:1px solid var(--line);border-radius:var(--rmd);padding:10px 11px}
+  .ikpi .n{font-size:21px;font-weight:700;line-height:1;letter-spacing:-.5px}
+  .ikpi .l{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.25}
+  .ikpi.primary{background:var(--rose);border-color:var(--rose)} .ikpi.primary .n,.ikpi.primary .l{color:#fff}
+  .ikpi.warn .n{color:#C98A2E} .ikpi.bad .n{color:#C5483B}
+  .ibadge{font-size:10.5px;border-radius:20px;padding:2px 8px;font-weight:600;white-space:nowrap;display:inline-block;flex:0 0 auto}
+  .ibadge.ok{color:#3F9E5A;background:#E9F4EC} .ibadge.warn{color:#C98A2E;background:#FBF3E4} .ibadge.grey{color:#A79E97;background:#F1EDEA} .ibadge.bad{color:#C5483B;background:#FBEAE8}
+  .dov{position:fixed;inset:0;background:rgba(45,34,38,.4);z-index:55;opacity:0;pointer-events:none;transition:opacity .2s}
+  .dov.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;bottom:0;left:0;right:0;max-width:560px;margin:0 auto;max-height:86vh;background:var(--card);border-radius:var(--rxl) var(--rxl) 0 0;box-shadow:0 -8px 30px rgba(45,34,38,.2);padding:16px 18px 28px;overflow:auto;transform:translateY(101%);transition:transform .24s cubic-bezier(.2,.8,.2,1);z-index:60}
+  .sheet.open{transform:translateY(0)}
+  .sheet .grab{width:38px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px}
+  .sechead{font-size:12px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .tl{list-style:none;margin:0;padding:0}
+  .tl li{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .tl li .q{font-weight:700;white-space:nowrap;margin-left:auto} .tl li .q.plus{color:#3F9E5A} .tl li .q.minus{color:var(--rose)}
 </style>
 </head>
 <body>
@@ -93,6 +114,8 @@
     <button data-area="rivedi" onclick="App.go('rivedi')"><i class="ti ti-clipboard-check"></i>Rivedi</button>
     <button data-area="vedi" class="on" onclick="App.go('vedi')"><i class="ti ti-stack-2"></i>Vedi</button>
   </div>
+  <div id="drawerov" class="dov" onclick="App.closeInv()"></div>
+  <div id="drawer" class="sheet"></div>
   <div class="toast" id="toast"></div>
 </div>
 
@@ -117,11 +140,14 @@
   function srv(fn,arg,cb){
     if(HAS_GSR){
       var r=google.script.run.withSuccessHandler(cb).withFailureHandler(function(e){cb({ok:false,error:'exception',detail:(e&&e.message)||String(e)});});
-      if(fn==='gestWrite')r.gestWrite(arg); else if(fn==='gestPing')r.gestPing(arg); else if(fn==='gestSnapshot')r.gestSnapshot(); else if(fn==='gestConfigStatus')r.gestConfigStatus(); else if(fn==='gestSaveConfig')r.gestSaveConfig(arg);
+      if(fn==='gestWrite')r.gestWrite(arg); else if(fn==='gestPing')r.gestPing(arg); else if(fn==='gestSnapshot')r.gestSnapshot(); else if(fn==='gestUnified')r.gestUnified(); else if(fn==='gestTimeline')r.gestTimeline(arg); else if(fn==='gestSkuhist')r.gestSkuhist(); else if(fn==='gestConfigStatus')r.gestConfigStatus(); else if(fn==='gestSaveConfig')r.gestSaveConfig(arg);
     } else {
       if(fn==='gestWrite')jsonp('write',{p:JSON.stringify(arg)},cb);
       else if(fn==='gestPing')jsonp('ping',{pin:arg},cb);
       else if(fn==='gestSnapshot')jsonp('data',{},cb);
+      else if(fn==='gestUnified')jsonp('unified',{},cb);
+      else if(fn==='gestTimeline')jsonp('timeline',{codice:arg},cb);
+      else if(fn==='gestSkuhist')jsonp('skuhist',{},cb);
       else if(fn==='gestConfigStatus')jsonp('configstatus',{},cb);
       else if(fn==='gestSaveConfig')jsonp('saveconfig',{p:JSON.stringify(arg)},cb);
     }
@@ -178,35 +204,115 @@
   function clearBottom(){ bottombar.innerHTML=''; bottombar.style.display='none'; }
   function setBottom(html){ bottombar.innerHTML=html; bottombar.style.display='flex'; }
 
-  // ===================== VEDI =====================
+  // ===================== VEDI (Inventario + Disponibilita + Stato) =====================
+  var CONTA_MAX_AGE = 21;
   function renderVedi(){ clearBottom();
-    main.innerHTML = '<div class="pad" style="padding-bottom:8px"><div class="search"><i class="ti ti-search"></i><input id="q" type="text" placeholder="cerca prodotto" value="'+esc(state.vediQ)+'"></div></div>'
-      + '<div class="pad" style="padding-top:0;padding-bottom:8px"><div class="chips">'+chip('all','Tutti')+chip('conto','In conto vendita')+chip('low','Bassa giacenza')+'</div></div>'
-      + '<div class="pad stack" id="grid" style="padding-top:0"></div><div class="gen">aggiornato '+esc(G.generato)+'</div>';
-    document.getElementById('q').addEventListener('input',function(){ state.vediQ=this.value; paintGrid(); });
-    paintGrid();
+    var vt = state.vediTab || 'inv';
+    main.innerHTML = '<div class="pad" style="padding-bottom:6px"><div class="subtab">'+stab('inv','Inventario',vt)+stab('disp','Disponibilita',vt)+stab('stato','Stato',vt)+'</div></div><div id="vtab"></div>';
+    if(vt==='inv') renderInvTab(); else if(vt==='disp') renderDispTab(); else renderStatoTab();
   }
-  function chip(f,l){ return '<span class="chip'+(state.vediFilter===f?' on':'')+'" onclick="App.vf(\''+f+'\')">'+l+'</span>'; }
-  function paintGrid(){
-    var q=state.vediQ.trim().toLowerCase();
-    var list=G.prodotti.filter(function(p){
-      if(state.vediFilter==='conto'&&!(nz(p.in_conto)>0))return false;
-      if(state.vediFilter==='low'&&!(nz(p.disponibili)!=null&&p.disponibili<=2))return false;
-      if(q){ if((dispName(p)+' '+p.codice).toLowerCase().indexOf(q)<0)return false; }
+  function stab(id,l,cur){ return '<div class="t'+(cur===id?' on':'')+'" onclick="App.vtab(\''+id+'\')">'+l+'</div>'; }
+  function contaInfo(p){ var d=p.conta; if(!d) return {d:null,days:null,fresh:false,expiring:false}; var t=Date.parse(d); if(isNaN(t)) return {d:d,days:null,fresh:false}; var days=Math.floor((Date.now()-t)/86400000); if(days<0)days=0; return {d:d,days:days,fresh:days<=CONTA_MAX_AGE,expiring:days<=CONTA_MAX_AGE&&days>=CONTA_MAX_AGE-7}; }
+  function statusOf(p){
+    if(p.shop_status==='DRAFT') return {cls:'grey',txt:'Bozza',tip:'In bozza su Shopify: il sync non lo tocca.'};
+    if(p.skip) return {cls:'grey',txt:'In SKIP',tip:'Escluso dal sync di proposito: '+p.skip};
+    var onShop=!!p.shop_status;
+    if(p.giac==null){
+      if(onShop) return {cls:'warn',txt:'Manca nel gestionale',tip:'Attivo su Shopify ma senza giacenza in INVENTARIO (o join CODICE fallito).'};
+      var hard=p.nmov?(p.nmov.arrivi+p.nmov.von+p.nmov.voff):0;
+      if(hard) return {cls:'warn',txt:'Non in INVENTARIO',tip:hard+' movimenti sotto un codice non censito in INVENTARIO: non scalano giacenza.'};
+      if(p.nmov&&p.nmov.gift) return {cls:'grey',txt:'Regali fuori inventario',tip:p.nmov.gift+' regali sotto un codice non censito.'};
+      return {cls:'grey',txt:'Senza giacenze'};
+    }
+    if(p.giac<0) return {cls:'warn',txt:'Giacenza negativa',tip:'Sotto zero: di solito manca un acquisto in ACQUISTI.'};
+    if(p.in_inv&&p.att!=null&&Math.abs(p.att-p.giac)>=1) return {cls:'warn',txt:'Movimenti incoerenti',tip:'Giacenza '+p.giac+' ma i movimenti danno '+p.att+': formula rotta o valore a mano.'};
+    var ci=contaInfo(p), exp=(ci.fresh&&p.disponibili!=null)?p.disponibili:p.shopify_push;
+    if(exp==null) exp=p.shopify_push;
+    if(!onShop) return (exp>0)?{cls:'warn',txt:'Assente online',tip:'Dovrebbe mostrare '+exp+' pezzi ma non risulta attivo su Shopify.'}:{cls:'grey',txt:'Solo gestionale',tip:'Con pochi pezzi va bene che online sia esaurito.'};
+    if(p.shop_qty>p.giac) return {cls:'bad',txt:'Oversell +'+(p.shop_qty-p.giac),tip:'Il sito mostra piu pezzi di quelli in magazzino.'};
+    if(p.shop_qty===exp) return ci.fresh?{cls:'ok',txt:'OK (conta)',tip:'Conta del '+ci.d+': il sito espone i Disponibili pieni.'}:{cls:'ok',txt:'OK',tip:'Il sito rispetta Disponibili meno il cuscinetto.'};
+    if(ci.fresh&&p.shop_qty<exp) return {cls:'warn',txt:'Sotto il verificato',tip:'Conta del '+ci.d+': attesi '+exp+' online, ne mostra '+p.shop_qty+'. Probabile vendita in transito.'};
+    if(p.shop_qty<exp) return {cls:'warn',txt:'-'+(exp-p.shop_qty)+' online',tip:'Attesi '+exp+' online, ne mostra '+p.shop_qty+'.'};
+    return {cls:'warn',txt:'Buffer ridotto',tip:'Il sito mostra '+p.shop_qty+' con gestionale '+p.giac+', cuscinetto non applicato.'};
+  }
+  function coverHtml(p){ if(p.giac==null) return '<span class="muted">—</span>'; if(!(p.sales60>0)) return '<span class="muted" title="Nessuna vendita 60gg">&#8734;</span>'; var c=p.copertura, col=c<15?'#C5483B':(c<30?'#854F0B':'var(--text)'); return '<span style="color:'+col+';font-weight:600" title="'+p.sales60+' vendite 60gg">'+c+' gg</span>'; }
+  function stOrder(p){ var c=statusOf(p).cls; return c==='bad'?0:(c==='warn'?1:(c==='ok'?2:3)); }
+  function invKpis(){
+    var P=G.prodotti||[];
+    var attivi=P.filter(function(p){return p.shop_status==='ACTIVE';}).length;
+    var pezzi=P.reduce(function(a,p){return a+(p.shop_status==='ACTIVE'&&p.shop_qty>0?p.shop_qty:0);},0);
+    var daInd=0,overs=0; P.forEach(function(p){var c=statusOf(p).cls; if(c==='warn')daInd++; else if(c==='bad')overs++;});
+    var daCont=P.filter(function(p){return p.in_inv&&p.giac!=null&&p.giac>=1&&p.giac<=2&&p.shop_status!=='DRAFT'&&!contaInfo(p).fresh;}).length;
+    var chgN=Object.keys(G.chg||{}).length;
+    function k(cls,n,l){ return '<div class="ikpi '+cls+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+    return '<div class="ikpis">'+k('primary',attivi,'Attivi Shopify')+k('',pezzi,'Pezzi online')+k('warn',daInd,'Da indagare')+k('bad',overs,'Oversell')+k('warn',daCont,'Da contare')+k('warn',chgN,'Sync in attesa')+'</div>';
+  }
+  function ichip(f,l){ return '<span class="chip'+((state.invFilter||'prob')===f?' on':'')+'" onclick="App.invf(\''+f+'\')">'+l+'</span>'; }
+  function renderInvTab(){
+    document.getElementById('vtab').innerHTML = invKpis()
+      +'<div class="pad" style="padding-bottom:6px"><div class="search"><i class="ti ti-search"></i><input id="q" type="text" placeholder="cerca prodotto" value="'+esc(state.vediQ)+'"></div></div>'
+      +'<div class="pad" style="padding-top:0;padding-bottom:6px"><div class="chips">'+ichip('prob','Da sistemare')+ichip('inv','In inventario')+ichip('conto','In conto')+ichip('all','Tutti')+'</div></div>'
+      +'<div class="pad stack" id="grid" style="padding-top:0"></div><div class="gen">aggiornato '+esc((G.freshness&&G.freshness.master)||G.generato)+'</div>';
+    document.getElementById('q').addEventListener('input',function(){ state.vediQ=this.value; paintInv(); });
+    paintInv();
+  }
+  function paintInv(){
+    var query=state.vediQ.trim().toLowerCase(), f=state.invFilter||'prob';
+    var list=(G.prodotti||[]).filter(function(p){
+      if(f==='inv'&&!p.in_inv)return false;
+      if(f==='conto'&&!(nz(p.in_conto)>0))return false;
+      if(f==='prob'){ var c=statusOf(p).cls; if(c!=='warn'&&c!=='bad')return false; }
+      if(query&&(dispName(p)+' '+p.codice).toLowerCase().indexOf(query)<0)return false;
       return true;
     });
+    list.sort(function(a,b){ var oa=stOrder(a),ob=stOrder(b); if(oa!==ob)return oa-ob; var na=dispName(a).toLowerCase(),nb=dispName(b).toLowerCase(); return na<nb?-1:(na>nb?1:0); });
     var grid=document.getElementById('grid');
-    grid.innerHTML = list.length? list.map(prodCard).join('') : '<div class="empty"><i class="ti ti-search-off"></i>Nessun prodotto.</div>';
+    grid.innerHTML = list.length? list.slice(0,300).map(prodCardInv).join('') : '<div class="empty"><i class="ti ti-search-off"></i>Nessun prodotto.</div>';
   }
-  function prodCard(p){
-    var low=nz(p.disponibili)!=null&&p.disponibili<=2;
-    var shops=Object.keys(p.in_conto_by_shop||{});
-    var cl=shops.length?'<div style="margin-top:9px;font-size:12px;color:var(--muted)"><i class="ti ti-building-store" style="font-size:14px;vertical-align:-2px;color:var(--rose)"></i> '+shops.map(function(s){return p.in_conto_by_shop[s]+' '+esc(s);}).join(' · ')+'</div>':'';
-    return '<div class="card"><div class="row">'+thumb(p.photo)+'<div style="flex:1;min-width:0"><div class="name">'+esc(dispName(p))+'</div><div class="code mono">'+esc(p.codice)+'</div></div>'+(low?'<span class="soon">bassa</span>':'')+'</div>'
-      +'<div class="strip">'+st(dash(p.giac),'Giacenza')+sp()+st(dash(p.in_conto!=null?p.in_conto:0),'In conto')+sp()+st('<span class="hl">'+dash(p.disponibili)+'</span>','Disponib.')+sp()+st(dash(p.shopify_push),'Shopify')+'</div>'+cl+'</div>';
-  }
-  function st(n,l){ return '<div class="st"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+  function stcell(n,l){ return '<div class="st"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
   function sp(){ return '<div class="sep"></div>'; }
+  function prodCardInv(p){
+    var s=statusOf(p);
+    var dv=(p.giac!=null&&p.shop_qty!=null)?(p.shop_qty-p.giac):null;
+    var dstr=(dv==null)?'—':((dv>0?'+':'')+dv);
+    var ci=contaInfo(p);
+    var contaTxt=ci.d?(ci.fresh?('conta '+(ci.days===0?'oggi':ci.days+'gg')):'conta scaduta'):'mai contato';
+    return '<div class="card" style="cursor:pointer" onclick="App.openInv('+q(p.codice)+')">'
+      +'<div class="row">'+thumb(p.photo)+'<div style="flex:1;min-width:0"><div class="name">'+esc(dispName(p))+'</div><div class="code mono">'+esc(p.codice)+'</div></div><span class="ibadge '+s.cls+'">'+esc(s.txt)+'</span></div>'
+      +'<div class="strip">'+stcell(dash(p.giac),'Gestion.')+sp()+stcell('<span class="hl">'+dash(p.disponibili)+'</span>','Disponib.')+sp()+stcell(dash(p.shop_qty),'Shopify')+sp()+stcell('<span'+(dv<0?' style="color:#C5483B"':'')+'>'+dstr+'</span>','Δ')+'</div>'
+      +'<div style="margin-top:8px;font-size:11.5px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap"><span>'+coverHtml(p)+' copertura</span><span>'+esc(contaTxt)+'</span></div></div>';
+  }
+  function openInv(codice){
+    var p=(G.prodotti||[]).filter(function(x){return x.codice===codice;})[0]; if(!p)return;
+    var ci=contaInfo(p), s=statusOf(p), sub=[p.item,p.variante].filter(Boolean).join(' · ');
+    var ov=document.getElementById('drawerov'), sh=document.getElementById('drawer');
+    var h='<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'+thumb(p.photo)+'<div style="flex:1;min-width:0"><div class="name" style="white-space:normal">'+esc(dispName(p))+'</div><div class="code mono">'+esc(p.codice)+(sub?' · '+esc(sub):'')+'</div></div><span class="ibadge '+s.cls+'">'+esc(s.txt)+'</span></div>';
+    if(s.tip) h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+esc(s.tip)+'</div>';
+    h+='<div class="strip" style="margin-bottom:12px">'+stcell(dash(p.giac),'Gestionale')+sp()+stcell('<span class="hl">'+dash(p.disponibili)+'</span>','Disponib.')+sp()+stcell(dash(p.shop_qty),'Shopify'+(p.shop_status==='DRAFT'?' (bozza)':''))+sp()+stcell(dash(p.shopify_push),'Atteso')+'</div>';
+    var shops=Object.keys(p.in_conto_by_shop||{});
+    if(shops.length) h+='<div class="card" style="margin-bottom:10px;font-size:12.5px"><b>In conto vendita:</b> '+shops.map(function(x){return p.in_conto_by_shop[x]+' '+esc(x);}).join(' · ')+'</div>';
+    var ck=(G.chg||{})[p.codice]; if(ck) h+='<div class="card" style="margin-bottom:10px;background:var(--warnbg);font-size:12.5px"><b>Sync in attesa</b> ('+esc(ck.d)+'): '+esc(ck.txt)+'</div>';
+    var sl=(G.synclog||{})[p.codice]; if(sl) h+='<div class="card" style="margin-bottom:10px;font-size:12.5px"><b>Ultimo evento sync</b> ('+esc(sl.d)+'): '+esc(sl.txt)+'</div>';
+    h+='<div style="font-size:12px;color:var(--muted);margin-bottom:6px">copertura '+coverHtml(p)+' · '+(ci.d?('ultima conta '+esc(ci.d)+(ci.fresh?' (verificata)':' (scaduta)')):'mai contato')+(p.shop_upd?' · Shopify agg. '+esc(String(p.shop_upd).slice(0,10)):'')+'</div>';
+    h+='<div class="sechead" style="padding:8px 0 6px">Cronologia movimenti</div><div id="tl-body"><div class="muted" style="font-size:12.5px;padding:6px 0">Carico…</div></div>';
+    sh.innerHTML='<div class="grab"></div>'+h; ov.classList.add('on'); sh.classList.add('open');
+    srv('gestTimeline', codice, function(tl){
+      var b=document.getElementById('tl-body'); if(!b)return;
+      if(!tl||tl.error){ b.innerHTML='<div class="muted">timeline non disponibile</div>'; return; }
+      var mvv=[];
+      (tl.arrivi||[]).forEach(function(x){mvv.push({d:x.d,t:'in',q:x.q,txt:'Arrivo'+(x.forn?' da '+x.forn:'')});});
+      (tl.v_on||[]).forEach(function(x){mvv.push({d:x.d,t:'on',q:x.q,txt:'Vendita online'+(x.ord?' '+x.ord:'')});});
+      (tl.v_off||[]).forEach(function(x){mvv.push({d:x.d,t:'off',q:x.q,txt:'Vendita Qromo'+(x.pay?' ('+x.pay+')':'')});});
+      (tl.gifts||[]).forEach(function(x){mvv.push({d:x.d,t:'gift',q:x.q,txt:'Regalo'+(x.who?' a '+x.who:'')});});
+      mvv.sort(function(a,b){return (a.d||'')<(b.d||'')?1:((a.d||'')>(b.d||'')?-1:0);});
+      if(!mvv.length){ b.innerHTML='<div class="muted" style="font-size:12.5px">Nessun arrivo o vendita registrati.</div>'; return; }
+      var ico={'in':'ti-package-import','on':'ti-shopping-cart','off':'ti-building-store','gift':'ti-gift'};
+      b.innerHTML='<ul class="tl">'+mvv.slice(0,80).map(function(x){return '<li><i class="ti '+(ico[x.t]||'ti-point')+'" style="color:var(--rose);font-size:16px"></i><div style="flex:1;min-width:0"><div>'+esc(x.txt)+'</div><div style="font-size:11px;color:var(--faint)">'+esc(x.d||'')+'</div></div><span class="q '+(x.t==='in'?'plus':'minus')+'">'+(x.t==='in'?'+':'−')+x.q+'</span></li>';}).join('')+'</ul>';
+    });
+  }
+  function closeInv(){ var ov=document.getElementById('drawerov'),sh=document.getElementById('drawer'); if(sh)sh.classList.remove('open'); if(ov)ov.classList.remove('on'); }
+  function renderDispTab(){ document.getElementById('vtab').innerHTML='<div class="empty"><i class="ti ti-chart-line"></i>Disponibilita: in arrivo.</div>'; }
+  function renderStatoTab(){ document.getElementById('vtab').innerHTML='<div class="empty"><i class="ti ti-clipboard-list"></i>Stato Prodotti: in arrivo.</div>'; }
 
   // ===================== RIVEDI =====================
   function renderRivedi(){ clearBottom();
@@ -358,7 +464,7 @@
     p.innerHTML='<div class="pad" style="padding-top:0"><div class="card" style="padding:0;overflow:hidden"><div class="search" style="border-bottom:1px solid var(--line)"><i class="ti ti-search"></i><input id="catq" type="text" placeholder="cerca nel catalogo" style="width:100%;border:none"></div><div id="catres" style="max-height:280px;overflow:auto"></div></div></div>';
     function render(f){
       var query=(f||'').trim().toLowerCase();
-      var list=G.prodotti.filter(function(x){ if(fl.sel[x.codice])return false; if(!query)return true; return (dispName(x)+' '+x.codice).toLowerCase().indexOf(query)>=0; }).slice(0,40);
+      var list=G.prodotti.filter(function(x){ if(fl.sel[x.codice])return false; if(x.in_inv===false)return false; if(!query)return true; return (dispName(x)+' '+x.codice).toLowerCase().indexOf(query)>=0; }).slice(0,40);
       document.getElementById('catres').innerHTML = list.length? list.map(function(x){
         return '<div class="res" onclick="App.catAdd('+q(x.codice)+')">'+thumb(x.photo).replace('width:46px;height:46px','width:32px;height:32px')+'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(dispName(x))+'</div><div class="code mono">'+esc(x.codice)+'</div></div><i class="ti ti-plus" style="color:var(--rose)"></i></div>';
       }).join('') : '<div class="muted" style="padding:14px;font-size:13px">nessun risultato</div>';
@@ -426,7 +532,7 @@
   function endFlow(){ state.flow=null; state.fl=null; state.area='inserisci'; setHeader(); renderInserisci(); window.scrollTo(0,0); }
 
   function refreshData(cb){
-    srv('gestSnapshot', null, function(j){ if(j&&!j.error&&j.prodotti){ G=j; } if(cb)cb(); });
+    srv('gestUnified', null, function(j){ if(j&&!j.error&&j.prodotti){ G=j; } if(cb)cb(); });
   }
 
   // ===================== PIN =====================
@@ -471,7 +577,9 @@
       }
       if(state.area==='rivedi'&&state.shop){ state.shop=null; setHeader(); renderRivedi(); window.scrollTo(0,0); }
     },
-    vf:function(f){ state.vediFilter=f; renderVedi(); },
+    vtab:function(t){ state.vediTab=t; renderVedi(); window.scrollTo(0,0); },
+    invf:function(f){ state.invFilter=f; paintInv(); },
+    openInv:openInv, closeInv:closeInv,
     openShop:function(n){ state.shop=n; setHeader(); renderStatement(n); window.scrollTo(0,0); },
     flow:function(t,shop){ state._fromShop=!!shop; startFlow(t,shop); },
     flowShop:function(s){ state.fl.shop=s; if(state.fl.cfg.src==='conto')seedConto(s); state.fl.step='items'; setHeader(); renderFlow(); window.scrollTo(0,0); },
@@ -500,7 +608,7 @@
 
   function afterData(){ srv('gestConfigStatus', null, function(s){ if(s&&s.configured){ setHeader(); renderVedi(); } else { renderSetup(); } }); }
   if(window.__GEST){ G=window.__GEST; afterData(); }
-  else { main.innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Carico i dati…</div>'; srv('gestSnapshot', null, function(res){ if(res&&res.prodotti){ G=res; afterData(); } else { main.innerHTML='<div class="empty"><i class="ti ti-plug-connected-x"></i>Dati non caricati. Riprova tra poco.</div>'; } }); }
+  else { main.innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Carico i dati…</div>'; srv('gestUnified', null, function(res){ if(res&&res.prodotti){ G=res; afterData(); } else { main.innerHTML='<div class="empty"><i class="ti ti-plug-connected-x"></i>Dati non caricati. Riprova tra poco.</div>'; } }); }
 })();
 </script>
 </body>
