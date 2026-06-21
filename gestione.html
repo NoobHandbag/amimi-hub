@@ -181,6 +181,8 @@
   function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove('show');},2300); }
   function pad(n){ return (n<10?'0':'')+n; }
   function today(){ var d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+  function logAction(s){ try{ var L=JSON.parse(localStorage.getItem('gest_log')||'[]'); L.unshift({t:new Date().toISOString(), s:String(s)}); if(L.length>60)L=L.slice(0,60); localStorage.setItem('gest_log',JSON.stringify(L)); }catch(e){} }
+  function getLog(){ try{ return JSON.parse(localStorage.getItem('gest_log')||'[]'); }catch(e){ return []; } }
   function genSid(){ return 's'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
   function bag(p){ return p.nome || p.item || p.codice; }
   function val(id){ var e=document.getElementById(id); return e?String(e.value).trim():''; }
@@ -210,7 +212,7 @@
     if(state.flow){ t=FLOWCFG[state.flow].t; s=FLOWCFG[state.flow].sub+' · nuovo movimento'; back=true; }
     else if(state.area==='rivedi'&&state.scheda){ t=(state.scheda==='__new__'?'Nuovo negozio':'Scheda & accordo'); s='Rivedi · accordo rivenditore'; back=true; }
     else if(state.area==='rivedi'&&state.shop){ t=state.shop; s='Rivedi · estratto conto'; back=true; }
-    else { var H={inserisci:['Inserisci','cosa registri?'],modifica:['Modifica','movimenti recenti'],rivedi:['Negozi','Rivedi · estratto conto'],vedi:['Inventario','Vedi · giacenza e disponibilita']}; t=H[state.area][0]; s=H[state.area][1]; }
+    else { var H={inserisci:['Inserisci','cosa registri?'],modifica:['Modifica','azioni e movimenti'],rivedi:['Negozi','Rivedi · estratto conto'],vedi:['Inventario','Vedi · giacenza e disponibilita']}; t=H[state.area][0]; s=H[state.area][1]; }
     document.getElementById('title').textContent=t;
     document.getElementById('subtitle').textContent=s;
     document.getElementById('backbtn').style.display=back?'block':'none';
@@ -486,20 +488,29 @@
 
   // ===================== MODIFICA (feed read-only; edit/cancel = FASE C) =====================
   function renderModifica(){ clearBottom();
-    var mv=G.movimenti||[];
-    if(!mv.length){ main.innerHTML='<div class="empty"><i class="ti ti-history"></i>Nessun movimento recente.</div>'; return; }
-    var ICO={'b2b|venduto':['ti-cash-register','#993556'],'b2b|invio':['ti-truck-delivery','#185FA5'],'b2b|reso':['ti-arrow-back-up','#854F0B'],'gift|regalo':['ti-gift','#5B3E8E'],'gift|venduto':['ti-receipt','#0F6B5C']};
-    var h='',lastDay=null,open=false;
-    mv.forEach(function(m){
-      var day=m.data||'senza data';
-      if(day!==lastDay){ if(open)h+='</div>'; h+='<div class="sechead">'+esc(day)+'</div><div class="pad stack" style="padding-top:0">'; open=true; lastDay=day; }
-      var ic=ICO[m.src+'|'+m.tipo]||['ti-point','#8A7F82'];
-      var label=m.modello==='gift'?(m.tipo==='venduto'?'Vendita offline':'Regalo'):(m.tipo==='venduto'?(m.modello==='wholesale'?'Wholesale':'Venduto'):(m.tipo==='invio'?'Invio':'Reso'));
-      var right=(m.incasso!=null&&m.incasso>0)?'<span style="font-size:13px;font-weight:600;color:var(--ok)">+€'+eur(m.incasso)+'</span>':'<span style="font-size:12px;color:var(--faint)">'+m.qty+' pz</span>';
-      h+='<div class="card" style="cursor:pointer" onclick="App.soon()"><div class="row"><div class="ic" style="width:36px;height:36px;background:var(--bg)"><i class="'+ic[0]+'" style="font-size:18px;color:'+ic[1]+'"></i></div>'
-        +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">'+esc(label)+'</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(m.negozio?esc(m.negozio)+' · ':'')+m.qty+'× '+esc(m.codice)+'</div></div>'+right+'</div></div>';
-    });
-    if(open)h+='</div>';
+    var log=getLog(), mv=G.movimenti||[];
+    if(!log.length && !mv.length){ main.innerHTML='<div class="empty"><i class="ti ti-history"></i>Nessuna azione o movimento ancora.</div>'; return; }
+    var h='';
+    if(log.length){
+      h+='<div class="sechead">Le mie azioni <span style="text-transform:none;font-weight:400;color:var(--faint)">· questo dispositivo</span></div><div class="pad stack" style="padding-top:0">';
+      h+=log.slice(0,25).map(function(a){ var d=new Date(a.t); var when=isNaN(d.getTime())?esc(a.t):(d.toLocaleDateString('it-IT')+' · '+pad(d.getHours())+':'+pad(d.getMinutes())); return '<div class="card"><div class="row"><div class="ic" style="width:34px;height:34px;background:var(--rosebg)"><i class="ti ti-check" style="font-size:16px;color:var(--rose)"></i></div><div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600">'+esc(a.s)+'</div><div style="font-size:11px;color:var(--faint)">'+when+'</div></div></div></div>'; }).join('');
+      h+='</div>';
+    }
+    if(mv.length){
+      var ICO={'b2b|venduto':['ti-cash-register','#993556'],'b2b|invio':['ti-truck-delivery','#185FA5'],'b2b|reso':['ti-arrow-back-up','#854F0B'],'gift|regalo':['ti-gift','#5B3E8E'],'gift|venduto':['ti-receipt','#0F6B5C']};
+      h+='<div class="sechead">Movimenti dal gestionale</div>';
+      var lastDay=null,open=false;
+      mv.forEach(function(m){
+        var day=m.data||'senza data';
+        if(day!==lastDay){ if(open)h+='</div>'; h+='<div class="sechead" style="padding:8px 16px 4px;color:var(--muted)">'+esc(day)+'</div><div class="pad stack" style="padding-top:0">'; open=true; lastDay=day; }
+        var ic=ICO[m.src+'|'+m.tipo]||['ti-point','#8A7F82'];
+        var label=m.modello==='gift'?(m.tipo==='venduto'?'Vendita offline':'Regalo'):(m.tipo==='venduto'?(m.modello==='wholesale'?'Wholesale':'Venduto'):(m.tipo==='invio'?'Invio':'Reso'));
+        var right=(m.incasso!=null&&m.incasso>0)?'<span style="font-size:13px;font-weight:600;color:var(--ok)">+€'+eur(m.incasso)+'</span>':'<span style="font-size:12px;color:var(--faint)">'+m.qty+' pz</span>';
+        h+='<div class="card" style="cursor:pointer" onclick="App.soon()"><div class="row"><div class="ic" style="width:36px;height:36px;background:var(--bg)"><i class="'+ic[0]+'" style="font-size:18px;color:'+ic[1]+'"></i></div>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">'+esc(label)+'</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(m.negozio?esc(m.negozio)+' · ':'')+m.qty+'× '+esc(m.codice)+'</div></div>'+right+'</div></div>';
+      });
+      if(open)h+='</div>';
+    }
     main.innerHTML=h;
   }
 
@@ -661,6 +672,7 @@
     var btn=document.getElementById('doreg'); if(btn){ btn.disabled=false; btn.textContent='Conferma e registra'; }
     if(res&&res.ok){
       var pz=collectItems().reduce(function(a,b){return a+b.qty;},0);
+      logAction(state.fl.cfg.t+(state.fl.shop?(' · '+state.fl.shop):'')+' · '+pz+' pz');
       clearBottom();
       main.innerHTML='<div class="pad"><div class="card" style="text-align:center;padding:30px 20px"><i class="ti ti-circle-check" style="font-size:46px;color:var(--ok)"></i><div style="font-size:17px;font-weight:600;margin-top:10px">Registrato</div><div class="muted" style="margin-top:4px">'+pz+' pezzi · '+esc(state.fl.cfg.t)+'</div><div class="muted" style="font-size:12px;margin-top:8px">Aggiorno i dati...</div></div></div>';
       refreshData(function(){ endFlow(); toast('Movimento registrato'); });
@@ -736,7 +748,7 @@
       payload.pin=state.pin;
       var btn=document.getElementById('sc-save'); if(btn){ btn.disabled=true; btn.textContent='Salvo…'; }
       srv('gestSaveNegozio', payload, function(res){
-        if(res&&res.ok){ toast(res.changed===0?'Nessuna modifica':'Scheda salvata'); refreshData(function(){ state.scheda=null; if(isNew)state.shop=null; setHeader(); renderRivedi(); }); }
+        if(res&&res.ok){ if(res.changed!==0)logAction('Scheda negozio · '+nome+(res.mode==='append'?' (creato)':' (modificato)')); toast(res.changed===0?'Nessuna modifica':'Scheda salvata'); refreshData(function(){ state.scheda=null; if(isNew)state.shop=null; setHeader(); renderRivedi(); }); }
         else if(res&&res.error==='pin'){ state.pin=null; toast('PIN errato'); openPin(function(){ App.saveScheda(); }); }
         else { if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-device-floppy" style="vertical-align:-2px;margin-right:5px"></i>Salva scheda'; } var m=document.getElementById('sc-msg'); if(m)m.innerHTML='<span style="color:#993556">Errore: '+esc((res&&(res.detail||res.error))||'sconosciuto')+'</span>'; }
       });
