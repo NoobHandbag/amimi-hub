@@ -96,6 +96,12 @@
   .tl{list-style:none;margin:0;padding:0}
   .tl li{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px}
   .tl li .q{font-weight:700;white-space:nowrap;margin-left:auto} .tl li .q.plus{color:#3F9E5A} .tl li .q.minus{color:var(--rose)}
+  .dkpis{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px 4px}
+  .dkpi{flex:1 1 30%;min-width:100px;background:var(--card);border:1px solid var(--line);border-radius:var(--rmd);padding:11px}
+  .dkpi .t{font-size:10.5px;color:var(--muted);line-height:1.25} .dkpi .v{font-size:22px;font-weight:700;margin:3px 0;line-height:1} .dkpi .s{font-size:10px;color:var(--faint)}
+  .dkpi .up{color:#3F9E5A;font-size:13px;font-weight:600} .dkpi .dn{color:#C5483B;font-size:13px;font-weight:600} .dkpi .fl{color:var(--faint);font-size:13px}
+  .disp-tbl{width:100%;border-collapse:collapse;font-size:12.5px} .disp-tbl th{font-size:10.5px;color:var(--faint);font-weight:600} .disp-tbl th,.disp-tbl td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right} .disp-tbl th:first-child,.disp-tbl td:first-child{text-align:left}
+  .disp-tbl .cv.ok{color:#3F9E5A;font-weight:600} .disp-tbl .cv.warn{color:#C98A2E;font-weight:600} .disp-tbl .cv.bad{color:#C5483B;font-weight:700}
 </style>
 </head>
 <body>
@@ -311,7 +317,60 @@
     });
   }
   function closeInv(){ var ov=document.getElementById('drawerov'),sh=document.getElementById('drawer'); if(sh)sh.classList.remove('open'); if(ov)ov.classList.remove('on'); }
-  function renderDispTab(){ document.getElementById('vtab').innerHTML='<div class="empty"><i class="ti ti-chart-line"></i>Disponibilita: in arrivo.</div>'; }
+  function renderDispTab(){
+    var vt=document.getElementById('vtab');
+    vt.innerHTML='<div class="pad"><div class="empty"><i class="ti ti-loader-2"></i>Carico disponibilita…</div></div>';
+    srv('gestSkuhist', null, function(H){
+      if(!H||H.error){ vt.innerHTML='<div class="pad"><div class="empty"><i class="ti ti-chart-line"></i>Storico non disponibile.</div></div>'; return; }
+      renderDispData(vt,H);
+    });
+  }
+  function renderDispData(vt,H){
+    var daily=(H.daily||[]).slice();
+    if(!daily.length){ vt.innerHTML='<div class="pad"><div class="empty"><i class="ti ti-chart-line"></i>Nessun dato storico ancora.</div></div>'; return; }
+    var cur=daily[daily.length-1], prev=daily.length>1?daily[daily.length-2]:null;
+    function dl(k){ if(!prev)return ''; var d=cur[k]-prev[k]; if(d===0)return ' <span class="fl">&#177;0</span>'; return d>0?(' <span class="up">+'+d+'</span>'):(' <span class="dn">'+d+'</span>'); }
+    function card(t,v,d,s){ return '<div class="dkpi"><div class="t">'+t+'</div><div class="v">'+v+d+'</div><div class="s">'+s+'</div></div>'; }
+    var gen=H.generato?('aggiornato '+H.generato+' · '+(H.n_snapshot||daily.length)+' rilevazioni su '+daily.length+' giorni'):'';
+    var html='<div class="dkpis">'
+      +card('SKU acquistabili',cur.active_instock,dl('active_instock'),'ACTIVE e in stock')
+      +card('Varianti acquist.',cur.var_active_instock,dl('var_active_instock'),'singole varianti in stock')
+      +card('Attivi ma esauriti',cur.active_oos,dl('active_oos'),'vetrina vuota: stock 0')
+      +card('In stock non pubbl.',cur.instock_not_active,dl('instock_not_active'),'magazzino non esposto')
+      +card('Pubblicati (ACTIVE)',cur.active,dl('active'),'di cui '+cur.active_oos+' esauriti')
+      +'</div>';
+    html+='<div class="pad" style="padding:8px 16px">'+dispSvg(daily)+'</div>';
+    html+=dispTable('Per categoria',cur.by_macro,['Pelle','Tessuto','Accessori','Altro']);
+    html+=dispTable('Per linea',cur.by_line,null);
+    html+='<div class="gen">'+esc(gen)+'</div>';
+    vt.innerHTML=html;
+  }
+  function dispTable(title,obj,order){
+    obj=obj||{};
+    var keys=order?order.filter(function(x){return obj[x];}):Object.keys(obj);
+    if(!order)keys.sort(function(a,b){return (obj[b].active_oos-obj[a].active_oos)||(obj[b].active-obj[a].active);});
+    if(!keys.length)return '';
+    var h='<div class="pad" style="padding:10px 16px 4px"><div class="sechead">'+esc(title)+'</div></div><div class="pad" style="padding:2px 16px"><table class="disp-tbl"><thead><tr><th>'+(order?'Categoria':'Linea')+'</th><th>Pubbl.</th><th>Acquist.</th><th>Esaur.</th><th>Cop.</th></tr></thead><tbody>';
+    keys.forEach(function(k){ var v=obj[k]; var pct=v.active?Math.round(100*v.active_instock/v.active):0; var c=pct<60?'bad':(pct<85?'warn':'ok'); h+='<tr><td><b>'+esc(k)+'</b></td><td>'+v.active+'</td><td>'+v.active_instock+'</td><td>'+(v.active_oos?('<b>'+v.active_oos+'</b>'):'0')+'</td><td class="cv '+c+'">'+pct+'%</td></tr>'; });
+    h+='</tbody></table></div>';
+    return h;
+  }
+  function dispSvg(daily){
+    var W=720,H=240,pad=36,n=daily.length;
+    var maxv=Math.max(1,Math.max.apply(null,daily.map(function(d){return d.active;})));
+    function X(i){return n<=1?W/2:pad+i*(W-2*pad)/(n-1);}
+    function Y(v){return H-pad-(v)*(H-2*pad)/(maxv||1);}
+    function P(k){return daily.map(function(d,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Y(d[k]).toFixed(1);}).join(' ');}
+    function dots(k,c){return daily.map(function(d,i){return '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(d[k]).toFixed(1)+'" r="3.2" fill="'+c+'"><title>'+d.date+': '+d[k]+'</title></circle>';}).join('');}
+    var gy='',step=Math.max(1,Math.ceil(maxv/4));
+    for(var g=0;g<=maxv;g+=step){ gy+='<line x1="'+pad+'" y1="'+Y(g).toFixed(1)+'" x2="'+(W-pad)+'" y2="'+Y(g).toFixed(1)+'" stroke="#eee"/><text x="'+(pad-6)+'" y="'+(Y(g)+3).toFixed(1)+'" font-size="10" text-anchor="end" fill="#999">'+g+'</text>'; }
+    var gx=daily.map(function(d,i){ return (n<=8||i%Math.ceil(n/8)===0)?('<text x="'+X(i).toFixed(1)+'" y="'+(H-12)+'" font-size="10" text-anchor="middle" fill="#999">'+String(d.date).slice(5)+'</text>'):''; }).join('');
+    return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+gy
+      +'<path d="'+P('active')+'" fill="none" stroke="#c9c9c9" stroke-width="1.5" stroke-dasharray="4 3"/>'
+      +'<path d="'+P('active_instock')+'" fill="none" stroke="#3F9E5A" stroke-width="2.5"/>'+dots('active_instock','#3F9E5A')+gx
+      +'<text x="'+(W-pad)+'" y="16" font-size="11" text-anchor="end" fill="#3F9E5A">acquistabili</text>'
+      +'<text x="'+(W-pad)+'" y="31" font-size="11" text-anchor="end" fill="#bbb">pubblicati</text></svg>';
+  }
   function renderStatoTab(){ document.getElementById('vtab').innerHTML='<div class="empty"><i class="ti ti-clipboard-list"></i>Stato Prodotti: in arrivo.</div>'; }
 
   // ===================== RIVEDI =====================
