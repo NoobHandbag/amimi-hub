@@ -147,9 +147,10 @@
   function srv(fn,arg,cb){
     if(HAS_GSR){
       var r=google.script.run.withSuccessHandler(cb).withFailureHandler(function(e){cb({ok:false,error:'exception',detail:(e&&e.message)||String(e)});});
-      if(fn==='gestWrite')r.gestWrite(arg); else if(fn==='gestPing')r.gestPing(arg); else if(fn==='gestSnapshot')r.gestSnapshot(); else if(fn==='gestUnified')r.gestUnified(); else if(fn==='gestTimeline')r.gestTimeline(arg); else if(fn==='gestSkuhist')r.gestSkuhist(); else if(fn==='gestTracker')r.gestTracker(); else if(fn==='gestConfigStatus')r.gestConfigStatus(); else if(fn==='gestSaveConfig')r.gestSaveConfig(arg);
+      if(fn==='gestWrite')r.gestWrite(arg); else if(fn==='gestSaveNegozio')r.gestSaveNegozio(arg); else if(fn==='gestPing')r.gestPing(arg); else if(fn==='gestSnapshot')r.gestSnapshot(); else if(fn==='gestUnified')r.gestUnified(); else if(fn==='gestTimeline')r.gestTimeline(arg); else if(fn==='gestSkuhist')r.gestSkuhist(); else if(fn==='gestTracker')r.gestTracker(); else if(fn==='gestConfigStatus')r.gestConfigStatus(); else if(fn==='gestSaveConfig')r.gestSaveConfig(arg);
     } else {
       if(fn==='gestWrite')jsonp('write',{p:JSON.stringify(arg)},cb);
+      else if(fn==='gestSaveNegozio')jsonp('savenegozio',{p:JSON.stringify(arg)},cb);
       else if(fn==='gestPing')jsonp('ping',{pin:arg},cb);
       else if(fn==='gestSnapshot')jsonp('data',{},cb);
       else if(fn==='gestUnified')jsonp('unified',{},cb);
@@ -202,6 +203,7 @@
   function setHeader(){
     var t,s,back=false;
     if(state.flow){ t=FLOWCFG[state.flow].t; s=FLOWCFG[state.flow].sub+' · nuovo movimento'; back=true; }
+    else if(state.area==='rivedi'&&state.scheda){ t=(state.scheda==='__new__'?'Nuovo negozio':'Scheda & accordo'); s='Rivedi · accordo rivenditore'; back=true; }
     else if(state.area==='rivedi'&&state.shop){ t=state.shop; s='Rivedi · estratto conto'; back=true; }
     else { var H={inserisci:['Inserisci','cosa registri?'],modifica:['Modifica','movimenti recenti'],rivedi:['Negozi','Rivedi · estratto conto'],vedi:['Inventario','Vedi · giacenza e disponibilita']}; t=H[state.area][0]; s=H[state.area][1]; }
     document.getElementById('title').textContent=t;
@@ -408,10 +410,12 @@
 
   // ===================== RIVEDI =====================
   function renderRivedi(){ clearBottom();
+    if(state.scheda){ renderScheda(state.scheda); return; }
     if(state.shop){ renderStatement(state.shop); return; }
     var negs=G.negozi||[];
-    if(!negs.length){ main.innerHTML='<div class="empty"><i class="ti ti-building-store"></i>Nessun negozio ancora.<br>Compaiono quando registri un invio in conto vendita.</div>'; return; }
-    main.innerHTML='<div class="pad stack">'+negs.map(shopCard).join('')+'</div>';
+    var addBtn='<div class="pad" style="padding-bottom:6px"><button class="btn ghost" style="width:100%" onclick="App.scheda(\'__new__\')"><i class="ti ti-plus" style="vertical-align:-2px;margin-right:4px"></i>Nuovo negozio</button></div>';
+    if(!negs.length){ main.innerHTML=addBtn+'<div class="empty"><i class="ti ti-building-store"></i>Nessun negozio ancora.<br>Aggiungine uno, o compaiono quando registri un invio in conto vendita.</div>'; return; }
+    main.innerHTML=addBtn+'<div class="pad stack" style="padding-top:0">'+negs.map(shopCard).join('')+'</div>';
   }
   function shopCard(n){
     var deal=(n.perc!=null)?(Math.round(n.perc*100)+'% comm.'):(n.fee_fissa!=null?('fee €'+eur(n.fee_fissa)):'');
@@ -434,7 +438,31 @@
       +'<button class="btn" style="flex:1" onclick="App.flow(\'sale\','+q(shop)+')"><i class="ti ti-cash-register" style="vertical-align:-2px;margin-right:5px"></i>Vendita</button>'
       +'<button class="btn ghost" onclick="App.flow(\'reso\','+q(shop)+')"><i class="ti ti-arrow-back-up" style="vertical-align:-2px"></i> Reso</button>'
       +'<button class="btn ghost" onclick="App.flow(\'invio\','+q(shop)+')"><i class="ti ti-truck-delivery" style="vertical-align:-2px"></i> Invio</button></div>';
+    h+='<div class="pad" style="padding-top:0"><button class="btn ghost" style="width:100%" onclick="App.scheda('+q(shop)+')"><i class="ti ti-settings" style="vertical-align:-2px;margin-right:5px"></i>Scheda &amp; accordo</button></div>';
     main.innerHTML=h;
+  }
+
+  // ===================== SCHEDA NEGOZIO (FASE D) =====================
+  function renderScheda(shop){ clearBottom();
+    var isNew=(shop==='__new__'||!shop);
+    var n=isNew?{}:((G.negozi||[]).filter(function(x){return x.nome===shop;})[0]||{nome:shop});
+    function sel(id,opts,cur){ return '<select id="'+id+'" style="width:100%">'+opts.map(function(o){return '<option value="'+o[0]+'"'+((cur||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'; }
+    var hint='style="font-size:11px;color:var(--faint);margin-top:4px"';
+    var h='<div class="pad stack">'
+      +'<div class="card"><div class="lab">Nome negozio</div>'+(isNew?'<input id="sc-nome" type="text" placeholder="es. Boutique Como" style="width:100%">':'<div class="name" style="font-size:16px">'+esc(n.nome)+'</div>')+'</div>'
+      +'<div class="card"><div class="lab">Citta</div><input id="sc-citta" type="text" value="'+esc(n.citta||'')+'" style="width:100%"></div>'
+      +'<div class="card"><div class="lab">Contatto</div><input id="sc-contatto" type="text" value="'+esc(n.contatto||'')+'" placeholder="nome / telefono / email" style="width:100%"></div>'
+      +'<div class="card"><div class="lab">Tipo accordo</div>'+sel('sc-deal',[['commissione','Commissione %'],['fee_fissa','Fee fissa'],['entrambi','Entrambi']],n.tipo_deal||'commissione')+'</div>'
+      +'<div class="card"><div class="lab">Commissione negozio (%)</div><input id="sc-perc" type="number" min="0" max="100" step="1" value="'+(n.perc!=null?Math.round(n.perc*100):'')+'" placeholder="es. 40" style="width:100%"><div '+hint+'>la % che il negozio trattiene; si applica da sola in invio/vendita</div></div>'
+      +'<div class="card"><div class="lab">Fee fissa (€)</div><div style="display:flex;gap:8px"><input id="sc-fee" type="number" min="0" step="1" value="'+(n.fee_fissa!=null?n.fee_fissa:'')+'" placeholder="0" style="flex:1">'+sel('sc-freq',[['settimana','a settimana'],['mese','al mese']],n.fee_freq||'settimana')+'</div><div '+hint+'>canone ricorrente (un costo), non una quota per vendita</div></div>'
+      +'<div class="card"><div class="lab">Stato</div>'+sel('sc-stato',[['attivo','Attivo'],['sospeso','Sospeso']],n.stato||'attivo')+'</div>'
+      +(isNew?'<div class="card"><div class="lab">Inizio / fine accordo (opzionale)</div><div style="display:flex;gap:8px"><input id="sc-di" type="date" style="flex:1"><input id="sc-df" type="date" style="flex:1"></div></div>':'')
+      +'<div class="card"><div class="lab">Note</div><textarea id="sc-note" rows="2" style="width:100%">'+esc(n.note||'')+'</textarea></div>'
+      +'<button class="btn" id="sc-save" style="width:100%"><i class="ti ti-device-floppy" style="vertical-align:-2px;margin-right:5px"></i>Salva scheda</button>'
+      +'<div id="sc-msg" style="font-size:12.5px;color:var(--muted);text-align:center;min-height:16px"></div>'
+      +'</div>';
+    main.innerHTML=h;
+    document.getElementById('sc-save').addEventListener('click', App.saveScheda);
   }
 
   // ===================== MODIFICA (feed read-only; edit/cancel = FASE C) =====================
@@ -660,19 +688,39 @@
   // ===================== ROUTER =====================
   var R={vedi:renderVedi,rivedi:renderRivedi,inserisci:renderInserisci,modifica:renderModifica};
   window.App={
-    go:function(a){ state.area=a; if(a!=='rivedi')state.shop=null; if(a!=='inserisci'){state.flow=null;state.fl=null;} setHeader(); R[a](); window.scrollTo(0,0); },
+    go:function(a){ state.area=a; if(a!=='rivedi'){state.shop=null;state.scheda=null;} if(a!=='inserisci'){state.flow=null;state.fl=null;} setHeader(); R[a](); window.scrollTo(0,0); },
     back:function(){
       if(state.flow){ var fl=state.fl;
         if(fl.step==='review'){ fl.step='items'; setHeader(); renderFlow(); return; }
         if(fl.step==='items'&&(fl.cfg.src==='conto'||fl.cfg.needShop)&&!state._fromShop){ fl.step='pick'; fl.shop=null; setHeader(); renderFlow(); return; }
         endFlow(); return;
       }
+      if(state.scheda){ state.scheda=null; setHeader(); renderRivedi(); window.scrollTo(0,0); return; }
       if(state.area==='rivedi'&&state.shop){ state.shop=null; setHeader(); renderRivedi(); window.scrollTo(0,0); }
     },
     vtab:function(t){ state.vediTab=t; renderVedi(); window.scrollTo(0,0); },
     invf:function(f){ state.invFilter=f; paintInv(); },
     openInv:openInv, closeInv:closeInv,
     openShop:function(n){ state.shop=n; setHeader(); renderStatement(n); window.scrollTo(0,0); },
+    scheda:function(shop){ state.scheda=shop; setHeader(); renderRivedi(); window.scrollTo(0,0); },
+    saveScheda:function(){
+      var isNew=(state.scheda==='__new__');
+      var nome=isNew?((val('sc-nome')||'').trim()):state.scheda;
+      if(!nome){ toast('Scrivi il nome del negozio'); return; }
+      var percRaw=val('sc-perc');
+      var payload={ nome:nome, citta:val('sc-citta'), contatto:val('sc-contatto'), tipo_deal:val('sc-deal'),
+        perc:(percRaw===''||percRaw==null?'':(Number(percRaw)/100)), fee_fissa:val('sc-fee'), fee_freq:val('sc-freq'),
+        stato:val('sc-stato'), note:val('sc-note') };
+      if(isNew){ payload.data_inizio=val('sc-di'); payload.data_fine=val('sc-df'); }
+      if(!state.pin){ openPin(function(){ App.saveScheda(); }); return; }
+      payload.pin=state.pin;
+      var btn=document.getElementById('sc-save'); if(btn){ btn.disabled=true; btn.textContent='Salvo…'; }
+      srv('gestSaveNegozio', payload, function(res){
+        if(res&&res.ok){ toast(res.changed===0?'Nessuna modifica':'Scheda salvata'); refreshData(function(){ state.scheda=null; if(isNew)state.shop=null; setHeader(); renderRivedi(); }); }
+        else if(res&&res.error==='pin'){ state.pin=null; toast('PIN errato'); openPin(function(){ App.saveScheda(); }); }
+        else { if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-device-floppy" style="vertical-align:-2px;margin-right:5px"></i>Salva scheda'; } var m=document.getElementById('sc-msg'); if(m)m.innerHTML='<span style="color:#993556">Errore: '+esc((res&&(res.detail||res.error))||'sconosciuto')+'</span>'; }
+      });
+    },
     flow:function(t,shop){ state._fromShop=!!shop; startFlow(t,shop); },
     flowShop:function(s){ state.fl.shop=s; if(state.fl.cfg.src==='conto')seedConto(s); state.fl.step='items'; setHeader(); renderFlow(); window.scrollTo(0,0); },
     flowNewShop:function(){ var v=(document.getElementById('newshop')||{}).value||''; v=v.trim(); if(!v){toast('Scrivi un nome negozio');return;} App.flowShop(v); },
