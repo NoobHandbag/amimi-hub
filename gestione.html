@@ -357,8 +357,8 @@
     p.dataset.open='1';
     p.innerHTML='<div class="pad" style="padding-top:0"><div class="card" style="padding:0;overflow:hidden"><div class="search" style="border-bottom:1px solid var(--line)"><i class="ti ti-search"></i><input id="catq" type="text" placeholder="cerca nel catalogo" style="width:100%;border:none"></div><div id="catres" style="max-height:280px;overflow:auto"></div></div></div>';
     function render(f){
-      var q=(f||'').trim().toLowerCase();
-      var list=G.prodotti.filter(function(x){ if(fl.sel[x.codice])return false; if(!q)return true; return (dispName(x)+' '+x.codice).toLowerCase().indexOf(q)>=0; }).slice(0,40);
+      var query=(f||'').trim().toLowerCase();
+      var list=G.prodotti.filter(function(x){ if(fl.sel[x.codice])return false; if(!query)return true; return (dispName(x)+' '+x.codice).toLowerCase().indexOf(query)>=0; }).slice(0,40);
       document.getElementById('catres').innerHTML = list.length? list.map(function(x){
         return '<div class="res" onclick="App.catAdd('+q(x.codice)+')">'+thumb(x.photo).replace('width:46px;height:46px','width:32px;height:32px')+'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(dispName(x))+'</div><div class="code mono">'+esc(x.codice)+'</div></div><i class="ti ti-plus" style="color:var(--rose)"></i></div>';
       }).join('') : '<div class="muted" style="padding:14px;font-size:13px">nessun risultato</div>';
