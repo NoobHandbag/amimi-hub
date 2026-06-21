@@ -498,7 +498,7 @@
   function startFlow(type, shop){
     state.area='inserisci'; state.flow=type;
     var cfg=FLOWCFG[type];
-    state.fl={ type:type, cfg:cfg, shop:shop||null, recipient:{nome:'',cognome:''}, payment:'CASH', perc:0.40, sel:{}, step:'pick', sid:null };
+    state.fl={ type:type, cfg:cfg, shop:shop||null, recipient:{nome:'',cognome:''}, payment:'CASH', perc:((shop&&shopPerc(shop)!=null)?shopPerc(shop):0.40), sel:{}, step:'pick', sid:null };
     if(cfg.src==='conto'&&shop) seedConto(shop);
     if(cfg.src==='catalog'&&!cfg.needShop) state.fl.step='items';
     if(cfg.src==='conto'&&shop) state.fl.step='items';
@@ -722,7 +722,7 @@
       });
     },
     flow:function(t,shop){ state._fromShop=!!shop; startFlow(t,shop); },
-    flowShop:function(s){ state.fl.shop=s; if(state.fl.cfg.src==='conto')seedConto(s); state.fl.step='items'; setHeader(); renderFlow(); window.scrollTo(0,0); },
+    flowShop:function(s){ state.fl.shop=s; var sp=shopPerc(s); if(sp!=null)state.fl.perc=sp; if(state.fl.cfg.src==='conto')seedConto(s); state.fl.step='items'; setHeader(); renderFlow(); window.scrollTo(0,0); },
     flowNewShop:function(){ var v=(document.getElementById('newshop')||{}).value||''; v=v.trim(); if(!v){toast('Scrivi un nome negozio');return;} App.flowShop(v); },
     flowChangeShop:function(){ state.fl.step='pick'; state.fl.shop=null; state.fl.sel={}; state._fromShop=false; setHeader(); renderFlow(); },
     flowStep:function(s){ state.fl.step=s; setHeader(); renderFlow(); window.scrollTo(0,0); },
