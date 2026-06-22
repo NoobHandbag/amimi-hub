@@ -169,10 +169,11 @@
   function srv(fn,arg,cb){
     if(HAS_GSR){
       var r=google.script.run.withSuccessHandler(cb).withFailureHandler(function(e){cb({ok:false,error:'exception',detail:(e&&e.message)||String(e)});});
-      if(fn==='gestWrite')r.gestWrite(arg); else if(fn==='gestSaveNegozio')r.gestSaveNegozio(arg); else if(fn==='gestPing')r.gestPing(arg); else if(fn==='gestSnapshot')r.gestSnapshot(); else if(fn==='gestUnified')r.gestUnified(); else if(fn==='gestUnifiedFresh')r.gestUnifiedFresh(); else if(fn==='gestTimeline')r.gestTimeline(arg); else if(fn==='gestSkuhist')r.gestSkuhist(); else if(fn==='gestTracker')r.gestTracker(); else if(fn==='gestConfigStatus')r.gestConfigStatus(); else if(fn==='gestSaveConfig')r.gestSaveConfig(arg);
+      if(fn==='gestWrite')r.gestWrite(arg); else if(fn==='gestSaveNegozio')r.gestSaveNegozio(arg); else if(fn==='gestAnnulla')r.gestAnnulla(arg); else if(fn==='gestPing')r.gestPing(arg); else if(fn==='gestSnapshot')r.gestSnapshot(); else if(fn==='gestUnified')r.gestUnified(); else if(fn==='gestUnifiedFresh')r.gestUnifiedFresh(); else if(fn==='gestTimeline')r.gestTimeline(arg); else if(fn==='gestSkuhist')r.gestSkuhist(); else if(fn==='gestTracker')r.gestTracker(); else if(fn==='gestConfigStatus')r.gestConfigStatus(); else if(fn==='gestSaveConfig')r.gestSaveConfig(arg);
     } else {
       if(fn==='gestWrite')jsonp('write',{p:JSON.stringify(arg)},cb);
       else if(fn==='gestSaveNegozio')jsonp('savenegozio',{p:JSON.stringify(arg)},cb);
+      else if(fn==='gestAnnulla')jsonp('annulla',{p:JSON.stringify(arg)},cb);
       else if(fn==='gestPing')jsonp('ping',{pin:arg},cb);
       else if(fn==='gestSnapshot')jsonp('data',{},cb);
       else if(fn==='gestUnified')jsonp('unified',{},cb);
@@ -547,7 +548,7 @@
         var ic=ICO[m.src+'|'+m.tipo]||['ti-point','#8A7F82'];
         var label=m.modello==='gift'?(m.tipo==='venduto'?'Vendita offline':'Regalo'):(m.tipo==='venduto'?(m.modello==='wholesale'?'Wholesale':'Venduto'):(m.tipo==='invio'?'Invio':'Reso'));
         var right=(m.incasso!=null&&m.incasso>0)?'<span style="font-size:13px;font-weight:600;color:var(--ok)">+€'+eur(m.incasso)+'</span>':'<span style="font-size:12px;color:var(--faint)">'+m.qty+' pz</span>';
-        h+='<div class="card" style="cursor:pointer" onclick="App.soon()"><div class="row"><div class="ic" style="width:36px;height:36px;background:var(--bg)"><i class="'+ic[0]+'" style="font-size:18px;color:'+ic[1]+'"></i></div>'
+        h+='<div class="card" style="cursor:pointer" onclick="'+(m.src==='b2b'&&m.mov_id?('App.annulla('+q(m.mov_id)+')'):'App.soon()')+'"><div class="row"><div class="ic" style="width:36px;height:36px;background:var(--bg)"><i class="'+ic[0]+'" style="font-size:18px;color:'+ic[1]+'"></i></div>'
           +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">'+esc(label)+'</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(m.negozio?esc(m.negozio)+' · ':'')+m.qty+'× '+esc(m.codice)+'</div></div>'+right+'</div></div>';
       });
       if(open)h+='</div>';
@@ -806,7 +807,17 @@
     price:function(c,v){ if(state.fl.sel[c])state.fl.sel[c].prezzo=(v===''?0:Number(v)); refreshBottom(); },
     review:function(){ var t=totals(); if(t.pz===0){toast('Seleziona almeno un pezzo');return;} state.fl.step='review'; setHeader(); renderFlow(); window.scrollTo(0,0); },
     register:register,
-    soon:function(){ toast('Modifica/annulla: in arrivo (FASE C)'); },
+    soon:function(){ toast('Annullo non disponibile per questo movimento'); },
+    annulla:function(mov_id){
+      if(!mov_id){ toast('Movimento non annullabile da qui'); return; }
+      if(!window.confirm('Annullare questo movimento? Verra escluso da CE e giacenza (reversibile dal Master).')) return;
+      if(!state.pin){ openPin(function(){ App.annulla(mov_id); }); return; }
+      srv('gestAnnulla', {pin:state.pin, mov_id:mov_id}, function(res){
+        if(res&&res.ok){ logAction('Annullato movimento'+(res.already?' (era gia annullato)':'')); toast(res.already?'Gia annullato':'Movimento annullato'); refreshData(function(){ renderModifica(); }); }
+        else if(res&&res.error==='pin'){ state.pin=null; toast('PIN errato'); openPin(function(){App.annulla(mov_id);}); }
+        else toast('Errore: '+((res&&(res.detail||res.error))||'sconosciuto'));
+      });
+    },
     saveConfig:function(){
       var pin=val('cfg-pin'), secret=val('cfg-secret'), url=val('cfg-url'), msg=document.getElementById('cfg-msg');
       if(!pin||pin.length<4){ msg.innerHTML='<span style="color:#993556">PIN troppo corto (min 4)</span>'; return; }
