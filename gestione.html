@@ -246,7 +246,7 @@
     main.innerHTML='<div class="pad">'
       +'<div class="freshbar" style="padding:6px 0 12px"><i class="ti ti-clock-hour-4"></i><span style="flex:1">Aggiornato '+esc(fresh)+'</span><button id="refnow" class="refbtn" onclick="App.refreshNow()"><i class="ti ti-refresh"></i> aggiorna</button></div>'
       +'<div class="sechead" style="padding:2px 0 8px">Registra</div>'
-      +'<div class="homegrid">'+htile("App.flow('sale')",'#993556','#FBEAF0','ti-cash-register','Vendita')+htile("App.flow('invio')",'#185FA5','#E6F1FB','ti-truck-delivery','Invio')+htile("App.flow('gift')",'#5B3E8E','#F1ECF6','ti-gift','Regalo')+'</div>'
+      +'<div class="homegrid">'+htile("App.insMenu()",'#993556','#FBEAF0','ti-cash-register','Vendita')+htile("App.flow('invio')",'#185FA5','#E6F1FB','ti-truck-delivery','Invio')+htile("App.flow('gift')",'#5B3E8E','#F1ECF6','ti-gift','Regalo')+'</div>'
       +'<div class="sechead" style="padding:16px 0 8px">Apri</div>'
       +'<div class="homegrid">'+htile("App.go('vedi')",'#8B5E6B','#F6EEF0','ti-stack-2','Inventario')+htile("App.go('rivedi')",'#0F6B5C','#E4F4F1','ti-building-store','Negozi')+htile("App.go('modifica')",'#854F0B','#FAEEDA','ti-history','Azioni')+'</div>'
       +'</div>';
@@ -591,10 +591,11 @@
 
   function pickContoShop(){ clearBottom();
     var list=shopsWithConto();
-    if(!list.length){ main.innerHTML='<div class="empty"><i class="ti ti-building-store"></i>Nessun negozio ha borse in conto vendita.<br>Fai prima un <b>Invio</b>.</div>'; return; }
+    var alt='<div class="pad" style="padding-top:0"><div class="card" style="background:var(--rosebg);border:none"><div style="font-size:12.5px;color:var(--muted);line-height:1.5">Qui compaiono <b>solo i negozi con borse in conto vendita</b> (cioè a cui hai già fatto un Invio). Per una <b>vendita diretta pagata subito</b> usa Wholesale; per <b>mandare borse</b> a un negozio (anche nuovo) usa Invio.</div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost" style="flex:1" onclick="App.flow(\'wholesale\')"><i class="ti ti-receipt" style="vertical-align:-2px;margin-right:4px"></i>Wholesale</button><button class="btn ghost" style="flex:1" onclick="App.flow(\'invio\')"><i class="ti ti-truck-delivery" style="vertical-align:-2px;margin-right:4px"></i>Invio</button></div></div></div>';
+    if(!list.length){ main.innerHTML='<div class="empty" style="padding-bottom:6px"><i class="ti ti-building-store"></i>Nessun negozio ha borse in conto vendita.</div>'+alt; return; }
     main.innerHTML='<div class="sechead">Quale negozio?</div><div class="pad stack" style="padding-top:0">'+list.map(function(s){
       return '<div class="card" style="cursor:pointer" onclick="App.flowShop('+q(s.nome)+')"><div class="row"><div class="thumb"><i class="ti ti-building-store"></i></div><div style="flex:1;min-width:0"><div class="name">'+esc(s.nome)+'</div><div class="code">'+s.n+' borse in conto vendita</div></div><i class="ti ti-chevron-right chev"></i></div></div>';
-    }).join('')+'</div>';
+    }).join('')+'</div>'+alt;
   }
   function pickShop(){ clearBottom();
     var list=allShops();
@@ -762,6 +763,7 @@
   var R={home:renderHome,vedi:renderVedi,rivedi:renderRivedi,inserisci:renderInserisci,modifica:renderModifica};
   window.App={
     go:function(a){ state.area=a; if(a!=='rivedi'){state.shop=null;state.scheda=null;} if(a!=='inserisci'){state.flow=null;state.fl=null;} setHeader(); R[a](); window.scrollTo(0,0); },
+    insMenu:function(){ state.area='inserisci'; state.flow=null; state.fl=null; setHeader(); renderInserisci(); window.scrollTo(0,0); },
     back:function(){
       if(state.flow){ var fl=state.fl;
         if(fl.step==='review'){ fl.step='items'; setHeader(); renderFlow(); return; }
