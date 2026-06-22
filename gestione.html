@@ -209,7 +209,7 @@
   function val(id){ var e=document.getElementById(id); return e?String(e.value).trim():''; }
   function q(s){ return "'"+String(s==null?'':s).replace(/\\/g,'\\\\').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/'/g,"\\'")+"'"; }
 
-  var state = { area:'home', shop:null, vediFilter:'all', vediQ:'', pin:null, flow:null, fl:null };
+  var state = { area:'home', shop:null, vediFilter:'all', vediQ:'', pin:null, flow:null, fl:null, hideDraft:true };
 
   var FLOWCFG = {
     sale:      { t:'Vendita conto vendita', sub:'Inserisci', kind:'b2b', modello:'conto_vendita', tipo:'venduto', src:'conto', qlab:'venduti', ic:'ti-cash-register' },
@@ -311,7 +311,7 @@
     document.getElementById('vtab').innerHTML = invKpis()
       +'<div class="pad" style="padding-bottom:6px"><div class="search"><i class="ti ti-search"></i><input id="q" type="text" placeholder="cerca item, variante o codice" value="'+esc(state.vediQ)+'"></div></div>'
       +'<div class="pad" style="padding-top:0;padding-bottom:6px;display:flex;gap:8px"><select id="invItem" style="flex:1;min-width:0">'+itemOptions()+'</select><select id="invVar" style="flex:1;min-width:0">'+varOptions()+'</select></div>'
-      +'<div class="pad" style="padding-top:0;padding-bottom:6px"><div class="chips">'+ichip('prob','Da sistemare')+ichip('inv','In inventario')+ichip('conto','In conto')+ichip('all','Tutti')+'<span class="chip'+(state.invHideZero?' on':'')+'" onclick="App.invZero()">giacenza &gt;0</span></div></div>'
+      +'<div class="pad" style="padding-top:0;padding-bottom:6px"><div class="chips">'+ichip('prob','Da sistemare')+ichip('inv','In inventario')+ichip('conto','In conto')+ichip('all','Tutti')+'<span class="chip'+(state.invHideZero?' on':'')+'" onclick="App.invZero()">giacenza &gt;0</span><span class="chip'+(state.hideDraft?' on':'')+'" onclick="App.draftT()">no bozze</span></div></div>'
       +'<div class="pad stack" id="grid" style="padding-top:0"></div><div class="gen">aggiornato '+esc((G.freshness&&G.freshness.master)||G.generato)+'</div>';
     document.getElementById('q').addEventListener('input',function(){ state.vediQ=this.value; paintInv(); });
     document.getElementById('invItem').addEventListener('change',function(){ state.invItem=this.value; state.invVar=''; renderInvTab(); });
@@ -332,6 +332,7 @@
       if(state.invItem&&(p.item||'')!==state.invItem)return false;
       if(state.invVar&&(p.variante||'')!==state.invVar)return false;
       if(state.invHideZero&&!(nz(p.giac)>0))return false;
+      if(state.hideDraft&&p.shop_status==='DRAFT')return false;
       if(query&&(dispName(p)+' '+(p.item||'')+' '+(p.variante||'')+' '+p.codice).toLowerCase().indexOf(query)<0)return false;
       return true;
     });
@@ -570,7 +571,7 @@
   function startFlow(type, shop){
     state.area='inserisci'; state.flow=type;
     var cfg=FLOWCFG[type];
-    state.fl={ type:type, cfg:cfg, shop:shop||null, recipient:{nome:'',cognome:''}, payment:'CASH', perc:((shop&&shopPerc(shop)!=null)?shopPerc(shop):0.40), sel:{}, step:'pick', sid:null };
+    state.fl={ type:type, cfg:cfg, shop:shop||null, recipient:{nome:'',cognome:''}, payment:'CASH', perc:((shop&&shopPerc(shop)!=null)?shopPerc(shop):0.40), sel:{}, step:'pick', sid:null, data:today() };
     if(cfg.src==='conto'&&shop) seedConto(shop);
     if(cfg.src==='catalog'&&!cfg.needShop) state.fl.step='items';
     if(cfg.src==='conto'&&shop) state.fl.step='items';
@@ -608,6 +609,7 @@
   function itemsScreen(){
     var fl=state.fl, cfg=fl.cfg;
     var h='';
+    h+='<div class="pad" style="padding-bottom:6px;display:flex;align-items:center;gap:10px"><div class="lab" style="margin:0">data</div><input id="fldata" type="date" value="'+esc(fl.data||today())+'" max="'+today()+'" style="flex:1"><span class="muted" style="font-size:11px">oggi se non cambi</span></div>';
     if(fl.shop){ h+='<div class="pad" style="padding-bottom:6px"><div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 12px"><i class="ti ti-building-store" style="font-size:20px;color:var(--rose)"></i><div style="flex:1;font-weight:600">'+esc(fl.shop)+'</div><span class="pill" onclick="App.flowChangeShop()" style="cursor:pointer">cambia</span></div></div>'; }
     if(cfg.recipient){ h+='<div class="pad" style="padding-bottom:6px"><div class="lab">destinatario (facoltativo)</div><div style="display:flex;gap:8px"><input id="rnome" type="text" placeholder="nome" value="'+esc(fl.recipient.nome)+'" style="flex:1"><input id="rcognome" type="text" placeholder="cognome" value="'+esc(fl.recipient.cognome)+'" style="flex:1"></div></div>'; }
     if(cfg.perc){ h+='<div class="pad" style="padding-bottom:6px;display:flex;align-items:center;gap:10px"><div class="lab" style="margin:0">commissione negozio</div><input id="flperc" type="number" class="pinput" value="'+Math.round(fl.perc*100)+'"><span class="muted">%</span></div>'; }
@@ -622,6 +624,7 @@
     main.innerHTML=h;
     if(cfg.recipient){ document.getElementById('rnome').oninput=function(){fl.recipient.nome=this.value;}; document.getElementById('rcognome').oninput=function(){fl.recipient.cognome=this.value;}; }
     if(cfg.perc){ document.getElementById('flperc').oninput=function(){ fl.perc=(Number(this.value)||0)/100; }; }
+    var fd=document.getElementById('fldata'); if(fd){ fd.onchange=function(){ fl.data=this.value||today(); }; }
     refreshBottom();
   }
   function contoRows(){
@@ -654,15 +657,16 @@
     var fl=state.fl, p=document.getElementById('catpanel');
     if(p.dataset.open==='1'){ p.innerHTML=''; p.dataset.open='0'; return; }
     p.dataset.open='1';
-    p.innerHTML='<div class="pad" style="padding-top:0"><div class="card" style="padding:0;overflow:hidden"><div class="search" style="border-bottom:1px solid var(--line)"><i class="ti ti-search"></i><input id="catq" type="text" placeholder="cerca nel catalogo" style="width:100%;border:none"></div><div id="catres" style="max-height:280px;overflow:auto"></div></div></div>';
+    p.innerHTML='<div class="pad" style="padding-top:0"><div class="card" style="padding:0;overflow:hidden"><div class="search" style="border-bottom:1px solid var(--line)"><i class="ti ti-search"></i><input id="catq" type="text" placeholder="cerca nel catalogo" style="width:100%;border:none"></div><label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);cursor:pointer"><input id="catdraft" type="checkbox"'+(state.hideDraft?' checked':'')+'>Escludi bozze Shopify</label><div id="catres" style="max-height:280px;overflow:auto"></div></div></div>';
     function render(f){
       var query=(f||'').trim().toLowerCase();
-      var list=G.prodotti.filter(function(x){ if(fl.sel[x.codice])return false; if(x.in_inv===false)return false; if(!query)return true; return (dispName(x)+' '+x.codice).toLowerCase().indexOf(query)>=0; }).slice(0,40);
+      var list=G.prodotti.filter(function(x){ if(fl.sel[x.codice])return false; if(x.in_inv===false)return false; if(state.hideDraft&&x.shop_status==='DRAFT')return false; if(!query)return true; return (dispName(x)+' '+x.codice).toLowerCase().indexOf(query)>=0; }).slice(0,40);
       document.getElementById('catres').innerHTML = list.length? list.map(function(x){
-        return '<div class="res" onclick="App.catAdd('+q(x.codice)+')">'+thumb(x.photo).replace('width:46px;height:46px','width:32px;height:32px')+'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(itemTitle(x))+'</div><div class="vsub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(varSub(x)||x.codice)+'</div></div><i class="ti ti-plus" style="color:var(--rose)"></i></div>';
+        return '<div class="res" onclick="App.catAdd('+q(x.codice)+')">'+thumb(x.photo).replace('width:46px;height:46px','width:32px;height:32px')+'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(itemTitle(x))+(x.shop_status==='DRAFT'?' <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 5px;border-radius:6px;font-weight:600">bozza</span>':'')+'</div><div class="vsub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(varSub(x)||x.codice)+'</div></div><i class="ti ti-plus" style="color:var(--rose)"></i></div>';
       }).join('') : '<div class="muted" style="padding:14px;font-size:13px">nessun risultato</div>';
     }
     render(''); document.getElementById('catq').oninput=function(){render(this.value);};
+    document.getElementById('catdraft').onchange=function(){ state.hideDraft=this.checked; render(document.getElementById('catq').value); };
     document.getElementById('catq').focus();
   }
   function catAdd(codice){
@@ -677,8 +681,8 @@
   function collectItems(){
     var fl=state.fl, cfg=fl.cfg, out=[];
     Object.keys(fl.sel).forEach(function(c){ var s=fl.sel[c]; if(!(s.qty>0))return;
-      if(cfg.kind==='gift'){ out.push({data:today(),codice:c,qty:s.qty,nome:fl.recipient.nome,cognome:fl.recipient.cognome,prezzo:(s.prezzo!=null?Number(s.prezzo):0),payment:fl.payment,nota:''}); }
-      else { var it={data:today(),codice:c,qty:s.qty,modello:cfg.modello,tipo:cfg.tipo,negozio:fl.shop,nota:''};
+      if(cfg.kind==='gift'){ out.push({data:(fl.data||today()),codice:c,qty:s.qty,nome:fl.recipient.nome,cognome:fl.recipient.cognome,prezzo:(s.prezzo!=null?Number(s.prezzo):0),payment:fl.payment,nota:''}); }
+      else { var it={data:(fl.data||today()),codice:c,qty:s.qty,modello:cfg.modello,tipo:cfg.tipo,negozio:fl.shop,nota:''};
         if(cfg.modello==='wholesale'){ it.prezzo=(s.prezzo!=null?Number(s.prezzo):0); it.perc=0; }
         else if(cfg.tipo==='invio'){ it.prezzo=(s.prezzo!=null?Number(s.prezzo):0); it.perc=fl.perc; }
         else { it.prezzo=(s.prezzo!=null?Number(s.prezzo):''); it.perc=(s.perc!=null?s.perc:fl.perc); }
@@ -701,6 +705,7 @@
                  cfg.kind==='gift'? 'Va in GIFT_OFFLINE, esce dal magazzino.' : 'Escono dal conto vendita del negozio.';
     main.innerHTML='<div class="pad"><div class="card"><div style="font-size:14px;font-weight:600;margin-bottom:8px">'+ctx+'</div>'+lines
       +'<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>'+pz+' pezzi'+(cfg.kind==='gift'&&inc>0?' · incasso':'')+(cfg.tipo==='venduto'?' · incasso Amimì':'')+'</span><span>'+((cfg.tipo==='venduto'||(cfg.kind==='gift'&&inc>0))?'€'+eur(inc):'')+'</span></div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-top:6px">Data: '+esc((fl.data||today()).split('-').reverse().join('/'))+((fl.data||today())===today()?' (oggi)':' · retrodatata')+'</div>'
       +'<div style="font-size:12px;color:var(--muted);margin-top:8px">'+effect+'</div></div></div>';
     setBottom('<button class="btn ghost" onclick="App.flowStep(\'items\')">Modifica</button><button class="btn" style="flex:1" id="doreg" onclick="App.register()">Conferma e registra</button>');
   }
@@ -776,6 +781,7 @@
     vtab:function(t){ state.vediTab=t; renderVedi(); window.scrollTo(0,0); },
     invf:function(f){ state.invFilter=(state.invFilter===f?'all':f); renderInvTab(); },
     invZero:function(){ state.invHideZero=!state.invHideZero; renderInvTab(); },
+    draftT:function(){ state.hideDraft=!state.hideDraft; renderInvTab(); },
     refreshNow:function(){ var b=document.getElementById('refnow'); if(b){b.disabled=true;b.innerHTML='<i class="ti ti-loader-2"></i> aggiorno…';} srv('gestUnifiedFresh', null, function(j){ if(j&&!j.error&&j.prodotti){ G=j; } var a=state.area; if(a==='vedi')renderVedi(); else if(R[a])R[a](); toast('Dati aggiornati'); }); },
     openInv:openInv, closeInv:closeInv,
     openShop:function(n){ state.shop=n; setHeader(); renderStatement(n); window.scrollTo(0,0); },
