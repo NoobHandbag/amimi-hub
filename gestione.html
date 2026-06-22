@@ -230,7 +230,7 @@
   function setHeader(){
     var t,s,back=false;
     if(state.flow){ t=FLOWCFG[state.flow].t; s=FLOWCFG[state.flow].sub+' · nuovo movimento'; back=true; }
-    else if(state.area==='rivedi'&&state.scheda){ t=(state.scheda==='__new__'?'Nuovo negozio':'Scheda & accordo'); s='Rivedi · accordo rivenditore'; back=true; }
+    else if(state.area==='rivedi'&&state.scheda){ t=(state.scheda==='__new__'?'Nuovo negozio':'Modifica dati negozio'); s='Rivedi · dati e accordo'; back=true; }
     else if(state.area==='rivedi'&&state.shop){ t=state.shop; s='Rivedi · estratto conto'; back=true; }
     else { var H={home:['Gestione Amimì','cosa vuoi fare?'],inserisci:['Inserisci','cosa registri?'],modifica:['Modifica','azioni e movimenti'],rivedi:['Negozi','Rivedi · estratto conto'],vedi:['Inventario','Vedi · giacenza e disponibilita']}; t=(H[state.area]||H.home)[0]; s=(H[state.area]||H.home)[1]; }
     document.getElementById('title').textContent=t;
@@ -500,7 +500,7 @@
       +'<button class="btn" style="flex:1" onclick="App.flow(\'sale\','+q(shop)+')"><i class="ti ti-cash-register" style="vertical-align:-2px;margin-right:5px"></i>Vendita</button>'
       +'<button class="btn ghost" onclick="App.flow(\'reso\','+q(shop)+')"><i class="ti ti-arrow-back-up" style="vertical-align:-2px"></i> Reso</button>'
       +'<button class="btn ghost" onclick="App.flow(\'invio\','+q(shop)+')"><i class="ti ti-truck-delivery" style="vertical-align:-2px"></i> Invio</button></div>';
-    h+='<div class="pad" style="padding-top:0"><button class="btn ghost" style="width:100%" onclick="App.scheda('+q(shop)+')"><i class="ti ti-settings" style="vertical-align:-2px;margin-right:5px"></i>Scheda &amp; accordo</button></div>';
+    h+='<div class="pad" style="padding-top:0"><button class="btn ghost" style="width:100%" onclick="App.scheda('+q(shop)+')"><i class="ti ti-settings" style="vertical-align:-2px;margin-right:5px"></i>Modifica dati negozio</button></div>';
     main.innerHTML=h;
   }
 
