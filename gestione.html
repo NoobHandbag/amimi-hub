@@ -124,6 +124,17 @@
   .hlab{font-size:12.5px;font-weight:600}
   /* --- responsive: su desktop l'app si allarga --- */
   @media(min-width:920px){ :root{--appw:860px} .app{box-shadow:0 0 0 1px var(--line)} }
+  .alertgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .acard{border-radius:var(--rmd);padding:11px 12px;cursor:pointer}
+  .acard .an{font-size:22px;font-weight:700;line-height:1.05;letter-spacing:-.5px}
+  .acard .al{font-size:12px;margin-top:1px}
+  .acard.warn{background:#FAEEDA;color:#854F0B}
+  .acard.bad{background:#FCEBEB;color:#A32D2D}
+  .acard.info{background:#E6F1FB;color:#185FA5}
+  .mcard{background:var(--rosebg);border-radius:var(--rmd);padding:11px 12px}
+  .mcard .ml{font-size:12px;color:var(--muted)}
+  .mcard .mn{font-size:21px;font-weight:700;margin-top:2px;letter-spacing:-.5px}
+  .hmov{display:flex;align-items:center;gap:10px;padding:9px 0}
 </style>
 </head>
 <body>
@@ -140,7 +151,7 @@
     <button data-area="home" class="on" onclick="App.go('home')"><i class="ti ti-home"></i>Home</button>
     <button data-area="inserisci" onclick="App.go('inserisci')"><i class="ti ti-circle-plus"></i>Inserisci</button>
     <button data-area="rivedi" onclick="App.go('rivedi')"><i class="ti ti-building-store"></i>Negozi</button>
-    <button data-area="vedi" onclick="App.go('vedi')"><i class="ti ti-stack-2"></i>Vedi</button>
+    <button data-area="vedi" onclick="App.go('vedi')"><i class="ti ti-stack-2"></i>Inventario</button>
     <button data-area="modifica" onclick="App.go('modifica')"><i class="ti ti-history"></i>Azioni</button>
   </div>
   <div id="drawerov" class="dov" onclick="App.closeInv()"></div>
@@ -241,15 +252,47 @@
   }
   function clearBottom(){ bottombar.innerHTML=''; bottombar.style.display='none'; }
   function htile(onc,col,bg,ic,lab){ return '<div class="hometile" onclick="'+onc+'"><div class="hic" style="background:'+bg+';color:'+col+'"><i class="ti '+ic+'"></i></div><div class="hlab">'+lab+'</div></div>'; }
+  function mLabel(ym){ var mm=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic']; var p=String(ym).split('-'); return (mm[Number(p[1])-1]||'')+' '+String(p[0]||'').slice(2); }
+  function homeKpis(){
+    var P=G.prodotti||[]; var overs=0,daInd=0;
+    P.forEach(function(p){ var c=statusOf(p).cls; if(c==='warn')daInd++; else if(c==='bad')overs++; });
+    var daCont=P.filter(function(p){ return p.in_inv&&p.giac!=null&&p.giac>=1&&p.giac<=2&&p.shop_status!=='DRAFT'&&!contaInfo(p).fresh; }).length;
+    var chgN=Object.keys(G.chg||{}).length;
+    var inConto=(G.negozi||[]).filter(function(n){ return nz(n.in_conto)>0; }).length;
+    var pezzi=P.reduce(function(a,p){ return a+(p.shop_status==='ACTIVE'&&p.shop_qty>0?p.shop_qty:0); },0);
+    var mese=today().slice(0,7);
+    var vendMese=(G.movimenti||[]).filter(function(m){ return m.tipo==='venduto'&&String(m.data||'').slice(0,7)===mese; }).reduce(function(a,m){ return a+(m.incasso||0); },0);
+    return {overs:overs,daInd:daInd,daCont:daCont,chgN:chgN,inConto:inConto,pezzi:pezzi,vendMese:vendMese,mese:mese};
+  }
+  function homeMovRow(m,bd){
+    var ic=m.src==='gift'?'ti-gift':(m.tipo==='venduto'?'ti-cash-register':(m.tipo==='invio'?'ti-truck-delivery':(m.tipo==='reso'?'ti-arrow-back-up':'ti-tag')));
+    var right=''; if(m.tipo==='venduto'&&m.incasso!=null&&m.incasso>0)right='€'+eur(m.incasso); else if(m.src==='gift')right='omaggio'; else if(m.tipo==='invio')right='conto'; else if(m.tipo==='reso')right='reso';
+    var t=String(m.tipo||m.modello||''); t=t.charAt(0).toUpperCase()+t.slice(1);
+    var dstr=String(m.data||'').split('-').reverse().slice(0,2).join('/');
+    return '<div class="hmov"'+(bd?' style="border-bottom:1px solid var(--line)"':'')+'><i class="ti '+ic+'" style="font-size:16px;color:var(--muted)"></i><div style="flex:1;min-width:0"><div style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t)+(m.negozio?(' · '+esc(m.negozio)):'')+'</div><div style="font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+m.qty+'× '+esc(m.codice)+' · '+dstr+'</div></div><div style="font-size:13px;color:var(--muted);white-space:nowrap">'+right+'</div></div>';
+  }
   function renderHome(){ clearBottom();
     var fresh=(G.freshness&&G.freshness.master)||G.generato||'—';
-    main.innerHTML='<div class="pad">'
-      +'<div class="freshbar" style="padding:6px 0 12px"><i class="ti ti-clock-hour-4"></i><span style="flex:1">Aggiornato '+esc(fresh)+'</span><button id="refnow" class="refbtn" onclick="App.refreshNow()"><i class="ti ti-refresh"></i> aggiorna</button></div>'
-      +'<div class="sechead" style="padding:2px 0 8px">Registra</div>'
-      +'<div class="homegrid">'+htile("App.insMenu()",'#993556','#FBEAF0','ti-cash-register','Vendita')+htile("App.flow('invio')",'#185FA5','#E6F1FB','ti-truck-delivery','Invio')+htile("App.flow('gift')",'#5B3E8E','#F1ECF6','ti-gift','Regalo')+'</div>'
-      +'<div class="sechead" style="padding:16px 0 8px">Apri</div>'
-      +'<div class="homegrid">'+htile("App.go('vedi')",'#8B5E6B','#F6EEF0','ti-stack-2','Inventario')+htile("App.go('rivedi')",'#0F6B5C','#E4F4F1','ti-building-store','Negozi')+htile("App.go('modifica')",'#854F0B','#FAEEDA','ti-history','Azioni')+'</div>'
-      +'</div>';
+    var head='<div class="freshbar" style="padding:6px 0 12px"><i class="ti ti-clock-hour-4"></i><span style="flex:1">Aggiornato '+esc(fresh)+'</span><button id="refnow" class="refbtn" onclick="App.refreshNow()"><i class="ti ti-refresh"></i> aggiorna</button></div>'
+      +'<div class="sechead" style="padding:2px 0 8px">Registra</div><div class="homegrid">'+htile("App.insMenu()",'#993556','#FBEAF0','ti-cash-register','Vendita')+htile("App.flow('invio')",'#185FA5','#E6F1FB','ti-truck-delivery','Invio')+htile("App.flow('gift')",'#5B3E8E','#F1ECF6','ti-gift','Regalo')+'</div>';
+    if(!(G.prodotti&&G.prodotti.length)){
+      main.innerHTML='<div class="pad">'+head+'<div class="sechead" style="padding:16px 0 8px">Da controllare</div><div class="card" style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px"><i class="ti ti-loader-2"></i> Carico i dati…</div></div>'; return;
+    }
+    var k=homeKpis(); var al=[];
+    if(k.daCont>0) al.push(['warn',k.daCont,'da contare',"App.goInv('dacontare')"]);
+    if(k.overs>0)  al.push(['bad',k.overs,'oversell',"App.goInv('oversell')"]);
+    if(k.daInd>0)  al.push(['warn',k.daInd,'da indagare',"App.goInv('warn')"]);
+    if(k.chgN>0)   al.push(['warn',k.chgN,'sync in attesa',"App.goInv('sync')"]);
+    if(k.inConto>0)al.push(['info',k.inConto,(k.inConto===1?'negozio in conto':'negozi in conto'),"App.go('rivedi')"]);
+    var alerts = al.length ? '<div class="alertgrid">'+al.map(function(a){ return '<div class="acard '+a[0]+'" onclick="'+a[3]+'"><div class="an">'+a[1]+'</div><div class="al">'+a[2]+'</div></div>'; }).join('')+'</div>'
+      : '<div class="card" style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px"><i class="ti ti-circle-check" style="color:var(--ok)"></i> Tutto a posto, niente da controllare.</div>';
+    var sintesi='<div class="alertgrid"><div class="mcard"><div class="ml">Pezzi online</div><div class="mn">'+k.pezzi+'</div></div><div class="mcard"><div class="ml">Venduto B2B · '+mLabel(k.mese)+'</div><div class="mn">€'+eur(k.vendMese)+'</div></div></div>';
+    var mv=(G.movimenti||[]).slice().sort(function(a,b){ return String(b.data||'').localeCompare(String(a.data||'')); }).slice(0,3);
+    var ultimi = mv.length ? ('<div class="sechead" style="padding:16px 0 8px">Ultimi movimenti</div><div class="card" style="padding:2px 12px">'+mv.map(function(m,i){ return homeMovRow(m,i<mv.length-1); }).join('')+'</div>') : '';
+    main.innerHTML='<div class="pad">'+head
+      +'<div class="sechead" style="padding:16px 0 8px">Da controllare</div>'+alerts
+      +'<div class="sechead" style="padding:16px 0 8px">Sintesi</div>'+sintesi
+      +ultimi+'</div>';
   }
   function setBottom(html){ bottombar.innerHTML=html; bottombar.style.display='flex'; }
 
@@ -769,6 +812,7 @@
   window.App={
     go:function(a){ state.area=a; if(a!=='rivedi'){state.shop=null;state.scheda=null;} if(a!=='inserisci'){state.flow=null;state.fl=null;} setHeader(); R[a](); window.scrollTo(0,0); },
     insMenu:function(){ state.area='inserisci'; state.flow=null; state.fl=null; setHeader(); renderInserisci(); window.scrollTo(0,0); },
+    goInv:function(f){ state.invFilter=f; state.vediTab='inv'; App.go('vedi'); },
     back:function(){
       if(state.flow){ var fl=state.fl;
         if(fl.step==='review'){ fl.step='items'; setHeader(); renderFlow(); return; }
