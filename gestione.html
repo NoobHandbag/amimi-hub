@@ -148,8 +148,7 @@
   <main id="main"></main>
   <div id="bottombar" class="bottombar" style="display:none"></div>
   <div class="nav">
-    <button data-area="home" class="on" onclick="App.go('home')"><i class="ti ti-home"></i>Home</button>
-    <button data-area="inserisci" onclick="App.go('inserisci')"><i class="ti ti-circle-plus"></i>Inserisci</button>
+    <button data-area="inserisci" class="on" onclick="App.go('inserisci')"><i class="ti ti-circle-plus"></i>Inserisci</button>
     <button data-area="rivedi" onclick="App.go('rivedi')"><i class="ti ti-building-store"></i>Negozi</button>
     <button data-area="vedi" onclick="App.go('vedi')"><i class="ti ti-stack-2"></i>Inventario</button>
     <button data-area="modifica" onclick="App.go('modifica')"><i class="ti ti-history"></i>Azioni</button>
@@ -220,7 +219,7 @@
   function val(id){ var e=document.getElementById(id); return e?String(e.value).trim():''; }
   function q(s){ return "'"+String(s==null?'':s).replace(/\\/g,'\\\\').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/'/g,"\\'")+"'"; }
 
-  var state = { area:'home', shop:null, vediFilter:'all', vediQ:'', pin:null, flow:null, fl:null, hideDraft:true };
+  var state = { area:'inserisci', shop:null, vediFilter:'all', vediQ:'', pin:null, flow:null, fl:null, hideDraft:true };
 
   var FLOWCFG = {
     sale:      { t:'Vendita conto vendita', sub:'Inserisci', kind:'b2b', modello:'conto_vendita', tipo:'venduto', src:'conto', qlab:'venduti', ic:'ti-cash-register' },
@@ -605,7 +604,7 @@
     if(state.flow){ renderFlow(); return; }
     var G1=[['sale','#993556','#FBEAF0','Vendita conto vendita','un negozio ha venduto delle borse'],['invio','#185FA5','#E6F1FB','Invio','manda borse a un negozio'],['reso','#854F0B','#FAEEDA','Reso','borse rientrate da un negozio']];
     var G2=[['wholesale','#0F6B5C','#E4F4F1','Vendita wholesale','vendita diretta, pagata subito'],['gift','#5B3E8E','#F1ECF6','Regalo / Campione','omaggio, campione o vendita offline']];
-    function rows(arr){ return arr.map(function(a){ var c=FLOWCFG[a[0]]; return '<div class="act" onclick="App.flow(\''+a[0]+'\')"><div class="ic" style="background:'+a[2]+'"><i class="'+c.ic+'" style="color:'+a[1]+'"></i></div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">'+a[3]+'</div><div style="font-size:12px;color:var(--muted)">'+a[4]+'</div></div><i class="ti ti-chevron-right chev"></i></div>'; }).join(''); }
+    function rows(arr){ return arr.map(function(a){ var c=FLOWCFG[a[0]]; return '<div class="act" onclick="App.flow(\''+a[0]+'\')"><div class="ic" style="background:'+a[2]+'"><i class="ti '+c.ic+'" style="color:'+a[1]+'"></i></div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">'+a[3]+'</div><div style="font-size:12px;color:var(--muted)">'+a[4]+'</div></div><i class="ti ti-chevron-right chev"></i></div>'; }).join(''); }
     main.innerHTML='<div class="sechead">Conto vendita</div><div class="pad stack" style="padding-top:0">'+rows(G1)+'</div>'
       +'<div class="sechead">Vendite dirette e omaggi</div><div class="pad stack" style="padding-top:0;padding-bottom:16px">'+rows(G2)+'</div>';
   }
@@ -808,7 +807,7 @@
   }
 
   // ===================== ROUTER =====================
-  var R={home:renderHome,vedi:renderVedi,rivedi:renderRivedi,inserisci:renderInserisci,modifica:renderModifica};
+  var R={vedi:renderVedi,rivedi:renderRivedi,inserisci:renderInserisci,modifica:renderModifica};
   window.App={
     go:function(a){ state.area=a; if(a!=='rivedi'){state.shop=null;state.scheda=null;} if(a!=='inserisci'){state.flow=null;state.fl=null;} setHeader(); R[a](); window.scrollTo(0,0); },
     insMenu:function(){ state.area='inserisci'; state.flow=null; state.fl=null; setHeader(); renderInserisci(); window.scrollTo(0,0); },
@@ -883,7 +882,7 @@
     skipSetup:function(){ setHeader(); renderVedi(); }
   };
 
-  function afterData(){ srv('gestConfigStatus', null, function(s){ if(s&&s.configured){ setHeader(); (R[state.area]||renderHome)(); } else { renderSetup(); } }); }
+  function afterData(){ srv('gestConfigStatus', null, function(s){ if(s&&s.configured){ setHeader(); (R[state.area]||renderInserisci)(); } else { renderSetup(); } }); }
   if(window.__GEST){ G=window.__GEST; afterData(); }
   else { main.innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Carico i dati…</div>'; srv('gestUnified', null, function(res){ if(res&&res.prodotti){ G=res; afterData(); } else { main.innerHTML='<div class="empty"><i class="ti ti-plug-connected-x"></i>Dati non caricati. Riprova tra poco.</div>'; } }); }
 })();
